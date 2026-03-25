@@ -1,0 +1,13 @@
+{
+  "font_name": "LXGW WenKai",
+  "font_size": 46,
+  "secondary_font_size": 28,
+  "text_color": "#913e7f",
+  "bg_color": "#c5eaffe5",
+  "corner_radius": 8,
+  "padding_h": 28,
+  "padding_v": 30,
+  "margin_bottom": 30,
+  "line_spacing": 12,
+  "letter_spacing": 1
+}

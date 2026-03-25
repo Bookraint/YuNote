@@ -1,0 +1,4 @@
+[V4+ Styles]
+Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding
+Style: Default,LXGW WenKai,50,&H00ffffff,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,3.2,0,1,2.6,0,2,2,2,60,1,\q1
+Style: Secondary,LXGW WenKai,42,&H0000ccff,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,2.0,0,1,2.6,0,2,2,2,30,1,\q1
