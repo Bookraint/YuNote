@@ -24,8 +24,9 @@ from qfluentwidgets import (
 from app.common.config import cfg
 from app.components.EditComboBoxSettingCard import EditComboBoxSettingCard
 from app.components.LineEditSettingCard import LineEditSettingCard
-from app.config import APPDATA_PATH, VERSION
-from app.core.entities import LLMServiceEnum
+from app.components.PromptTemplateEditDialog import PromptTemplateEditDialog
+from app.config import APPDATA_PATH, VERSION, PROMPTS_PATH
+from app.core.entities import LLMServiceEnum, NoteSceneEnum, TranscribeModelEnum
 from app.core.llm.check_llm import check_llm_connection, get_available_models
 
 
@@ -70,19 +71,29 @@ class SettingInterface(ScrollArea):
     def _init_llm_group(self):
         group = SettingCardGroup("LLM 大模型", self._scroll_widget)
 
+        allowed_services = [LLMServiceEnum.OPENAI, LLMServiceEnum.OLLAMA]
+        if cfg.llm_service.value not in allowed_services:
+            # 避免旧配置指向不再暴露的服务商导致 UI/校验异常
+            cfg.set(cfg.llm_service, LLMServiceEnum.OPENAI)
+
         self._llm_service_card = ComboBoxSettingCard(
             cfg.llm_service,
             FIF.ROBOT,
             "服务商",
             "选择 LLM API 服务商",
-            texts=[s.value for s in LLMServiceEnum],
+            texts=[s.value for s in allowed_services],
             parent=group,
         )
         group.addSettingCard(self._llm_service_card)
 
-        # OpenAI
+        # OpenAI（兼容通用）
         self._openai_key_card = LineEditSettingCard(
-            cfg.openai_api_key, FIF.CERTIFICATE, "OpenAI API Key", "", group
+            cfg.openai_api_key,
+            FIF.CERTIFICATE,
+            "OpenAI API Key",
+            content="",
+            placeholder="",
+            parent=group,
         )
         self._openai_base_card = EditComboBoxSettingCard(
             cfg.openai_api_base, FIF.LINK, "OpenAI API Base", "",
@@ -92,34 +103,12 @@ class SettingInterface(ScrollArea):
             cfg.openai_model, FIF.LABEL, "OpenAI 模型", "",
             ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo"], group
         )
+
         group.addSettingCard(self._openai_key_card)
         group.addSettingCard(self._openai_base_card)
         group.addSettingCard(self._openai_model_card)
 
-        # DeepSeek
-        self._deepseek_key_card = LineEditSettingCard(
-            cfg.deepseek_api_key, FIF.CERTIFICATE, "DeepSeek API Key", "", group
-        )
-        self._deepseek_model_card = EditComboBoxSettingCard(
-            cfg.deepseek_model, FIF.LABEL, "DeepSeek 模型", "",
-            ["deepseek-chat", "deepseek-reasoner"], group
-        )
-        group.addSettingCard(self._deepseek_key_card)
-        group.addSettingCard(self._deepseek_model_card)
-
-        # SiliconCloud
-        self._sc_key_card = LineEditSettingCard(
-            cfg.silicon_cloud_api_key, FIF.CERTIFICATE, "SiliconCloud API Key", "", group
-        )
-        self._sc_model_card = EditComboBoxSettingCard(
-            cfg.silicon_cloud_model, FIF.LABEL, "SiliconCloud 模型", "",
-            ["Qwen/Qwen2.5-7B-Instruct", "Qwen/Qwen2.5-72B-Instruct",
-             "deepseek-ai/DeepSeek-V3"], group
-        )
-        group.addSettingCard(self._sc_key_card)
-        group.addSettingCard(self._sc_model_card)
-
-        # Ollama
+        # Ollama（本地）
         self._ollama_base_card = EditComboBoxSettingCard(
             cfg.ollama_api_base, FIF.LINK, "Ollama API Base", "",
             ["http://localhost:11434/v1"], group
@@ -131,17 +120,6 @@ class SettingInterface(ScrollArea):
         group.addSettingCard(self._ollama_base_card)
         group.addSettingCard(self._ollama_model_card)
 
-        # Gemini
-        self._gemini_key_card = LineEditSettingCard(
-            cfg.gemini_api_key, FIF.CERTIFICATE, "Gemini API Key", "", group
-        )
-        self._gemini_model_card = EditComboBoxSettingCard(
-            cfg.gemini_model, FIF.LABEL, "Gemini 模型", "",
-            ["gemini-2.0-flash", "gemini-1.5-pro"], group
-        )
-        group.addSettingCard(self._gemini_key_card)
-        group.addSettingCard(self._gemini_model_card)
-
         # 测试连接
         self._test_llm_card = PrimaryPushSettingCard(
             "测试连接", FIF.WIFI, "测试 LLM 连接", "验证当前服务商配置是否可用",
@@ -150,13 +128,26 @@ class SettingInterface(ScrollArea):
         self._test_llm_card.clicked.connect(self._test_llm)
         group.addSettingCard(self._test_llm_card)
 
+        def _refresh_llm_cards():
+            svc = cfg.llm_service.value
+            is_openai = svc == LLMServiceEnum.OPENAI
+
+            self._openai_key_card.setVisible(is_openai)
+            self._openai_base_card.setVisible(is_openai)
+            self._openai_model_card.setVisible(is_openai)
+
+            self._ollama_base_card.setVisible(not is_openai)
+            self._ollama_model_card.setVisible(not is_openai)
+
+        _refresh_llm_cards()
+        cfg.llm_service.valueChanged.connect(lambda *_: _refresh_llm_cards())
+
         self._expand_layout.addWidget(group)
 
     # ── 转录配置 ──────────────────────────────────────────────
 
     def _init_transcribe_group(self):
-        from app.components.FasterWhisperSettingWidget import FasterWhisperSettingWidget
-        from app.components.WhisperAPISettingWidget import WhisperAPISettingWidget
+        from app.components.TranscriptionSettingDialog import TranscriptionSettingDialog
 
         group = SettingCardGroup("转录引擎", self._scroll_widget)
 
@@ -180,11 +171,46 @@ class SettingInterface(ScrollArea):
         )
         group.addSettingCard(self._transcribe_lang_card)
 
-        self._faster_whisper_widget = FasterWhisperSettingWidget(group)
-        group.addSettingCard(self._faster_whisper_widget)
+        self._whisper_api_setting_card = PushSettingCard(
+            "打开",
+            FIF.SETTING,
+            "Whisper API 设置",
+            "打开弹窗编辑 Base URL / Key / 模型 / VAD 等参数",
+            group,
+        )
+        group.addSettingCard(self._whisper_api_setting_card)
+        self._whisper_api_setting_card.clicked.connect(
+            lambda: TranscriptionSettingDialog(self.window()).exec_()
+        )
 
-        self._whisper_api_widget = WhisperAPISettingWidget(group)
-        group.addSettingCard(self._whisper_api_widget)
+        # 仅在 Whisper API 模式下显示入口，避免 B 接口出现大空隙
+        def _resolve_transcribe_model() -> TranscribeModelEnum | None:
+            raw = cfg.transcribe_model.value
+            if isinstance(raw, TranscribeModelEnum):
+                return raw
+            if isinstance(raw, str):
+                for model in TranscribeModelEnum:
+                    if raw == model.value or raw == model.name:
+                        return model
+            return None
+
+        def _update_transcribe_engine_visibility():
+            model = _resolve_transcribe_model()
+            self._whisper_api_setting_card.setVisible(
+                model == TranscribeModelEnum.WHISPER_API
+            )
+            group.adjustSize()
+            self._scroll_widget.adjustSize()
+            self.viewport().update()
+
+        _update_transcribe_engine_visibility()
+        cfg.transcribe_model.valueChanged.connect(
+            lambda *_: _update_transcribe_engine_visibility()
+        )
+        # 某些情况下 ComboBox 改变先于 ConfigItem 更新，额外监听 UI 事件确保即时刷新
+        self._transcribe_model_card.comboBox.currentTextChanged.connect(  # type: ignore[attr-defined]
+            lambda *_: _update_transcribe_engine_visibility()
+        )
 
         self._expand_layout.addWidget(group)
 
@@ -221,12 +247,82 @@ class SettingInterface(ScrollArea):
         )
         group.addSettingCard(self._chunk_size_card)
 
+        # 场景模板：点击编辑（避免主页面滚动卡住）
+        scene_to_filename = {
+            NoteSceneEnum.MEETING: "summary_meeting.md",
+            NoteSceneEnum.LECTURE: "summary_lecture.md",
+            NoteSceneEnum.INTERVIEW: "summary_interview.md",
+            NoteSceneEnum.GENERAL: "summary_general.md",
+        }
+        scene_to_override_item = {
+            NoteSceneEnum.MEETING: cfg.summary_prompt_template_meeting,
+            NoteSceneEnum.LECTURE: cfg.summary_prompt_template_lecture,
+            NoteSceneEnum.INTERVIEW: cfg.summary_prompt_template_interview,
+            NoteSceneEnum.GENERAL: cfg.summary_prompt_template_general,
+        }
+
+        def _load_template_text(scene: NoteSceneEnum) -> str:
+            # 优先使用用户覆盖内容（为空则回退到内置模板）
+            override_item = scene_to_override_item.get(scene)
+            if override_item is not None and override_item.value:
+                return override_item.value
+
+            filename = scene_to_filename.get(scene, "summary_general.md")
+            template_path = PROMPTS_PATH / filename
+            if template_path.exists():
+                return template_path.read_text(encoding="utf-8")
+            return ""
+
+        def _preview(text: str) -> str:
+            lines = text.strip().splitlines()
+            first = lines[0] if lines else ""
+            first = first.strip()
+            if not first:
+                return self.tr("（内置模板）")
+            return first[:60] + ("…" if len(first) > 60 else "")
+
+        self._scene_template_edit_card = PushSettingCard(
+            self.tr("编辑"),
+            FIF.EDIT,
+            self.tr("场景模板"),
+            _preview(_load_template_text(cfg.default_scene.value)),
+            parent=group,
+        )
+        group.addSettingCard(self._scene_template_edit_card)
+
+        def _on_scene_template_edit():
+            scene = cfg.default_scene.value
+            override_item = scene_to_override_item.get(scene)
+            initial_text = _load_template_text(scene)
+
+            def _save(text: str):
+                if override_item is not None:
+                    cfg.set(override_item, text)
+                self._scene_template_edit_card.setContent(_preview(text))
+
+            dialog = PromptTemplateEditDialog(
+                initial_text=initial_text,
+                on_save=_save,
+                parent=self.window(),
+            )
+            dialog.exec_()
+
+        self._scene_template_edit_card.clicked.connect(_on_scene_template_edit)
+
+        def _on_summary_scene_changed(*_):
+            self._scene_template_edit_card.setContent(
+                _preview(_load_template_text(cfg.default_scene.value))
+            )
+
+        cfg.default_scene.valueChanged.connect(_on_summary_scene_changed)
+
         self._custom_prompt_card = LineEditSettingCard(
             cfg.summary_custom_prompt,
             FIF.EDIT,
             "追加指令",
-            "附加在 Prompt 末尾的自定义要求（留空则不追加）",
-            group,
+            content="",
+            placeholder="附加在 Prompt 末尾的自定义要求（留空则不追加）",
+            parent=group,
         )
         group.addSettingCard(self._custom_prompt_card)
 
@@ -283,18 +379,6 @@ class SettingInterface(ScrollArea):
     def _init_ui_group(self):
         group = SettingCardGroup("界面", self._scroll_widget)
 
-        self._mica_card = SwitchSettingCard(
-            FIF.TRANSPARENT,
-            "Mica 效果",
-            "窗口背景启用云母半透明效果（仅 Windows 11）",
-            cfg.micaEnabled,
-            group,
-        )
-        self._mica_card.checkedChanged.connect(
-            lambda checked: self.window().setMicaEffectEnabled(checked)
-        )
-        group.addSettingCard(self._mica_card)
-
         self._dpi_card = ComboBoxSettingCard(
             cfg.dpiScale,
             FIF.ZOOM,
@@ -304,15 +388,6 @@ class SettingInterface(ScrollArea):
             parent=group,
         )
         group.addSettingCard(self._dpi_card)
-
-        self._version_card = PushSettingCard(
-            "",
-            FIF.INFO,
-            f"版本  {VERSION}",
-            "小宇笔记助手 YuNote",
-            group,
-        )
-        group.addSettingCard(self._version_card)
 
         self._expand_layout.addWidget(group)
 

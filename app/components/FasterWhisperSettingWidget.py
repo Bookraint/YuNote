@@ -667,7 +667,8 @@ class FasterWhisperSettingWidget(QWidget):
         is_faster_whisper_exists, _ = check_faster_whisper_exists()
         if not is_faster_whisper_exists:
             self.show_error_info(self.tr("Faster Whisper程序不存在，请先下载程序"))
-            self._show_model_manager()
+            # 不在打开设置页时自动弹出下载弹窗，避免“随便点一下就弹窗”
+            # 由用户手动点击“管理模型”进行下载/更新。
         return
 
     def setup_ui(self):

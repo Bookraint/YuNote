@@ -133,6 +133,17 @@ class Summarizer:
         filename = _SCENE_PROMPT_FILES.get(self.config.scene, "summary_general.md")
         template_path = Path(self.config.prompts_path) / filename
 
+        # 如果用户在设置里覆盖了“场景模板”，优先使用覆盖内容
+        scene_override = {
+            NoteSceneEnum.MEETING: self.config.prompt_template_meeting,
+            NoteSceneEnum.LECTURE: self.config.prompt_template_lecture,
+            NoteSceneEnum.INTERVIEW: self.config.prompt_template_interview,
+            NoteSceneEnum.GENERAL: self.config.prompt_template_general,
+        }.get(self.config.scene, "")
+
+        if scene_override:
+            return scene_override
+
         if template_path.exists():
             return template_path.read_text(encoding="utf-8")
 

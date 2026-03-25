@@ -312,6 +312,11 @@ class SummaryConfig:
     llm_api_key: str = ""
     llm_model: str = "gpt-4o-mini"
     custom_prompt: str = ""         # 用户追加指令
+    # 用户可编辑的“场景模板”覆盖内容；为空时回退到 resource/prompts/summary_*.md
+    prompt_template_meeting: str = ""
+    prompt_template_lecture: str = ""
+    prompt_template_interview: str = ""
+    prompt_template_general: str = ""
     chunk_size: int = 4000          # 单块最大字符数（Map-Reduce 分块）
     prompts_path: str = ""          # resource/prompts/ 路径
 

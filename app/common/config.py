@@ -187,6 +187,10 @@ class Config(QConfig):
         "Summary", "ChunkSize", 4000, RangeValidator(1000, 10000)
     )
     summary_custom_prompt = ConfigItem("Summary", "CustomPrompt", "")
+    summary_prompt_template_meeting = ConfigItem("Summary", "PromptTemplateMeeting", "")
+    summary_prompt_template_lecture = ConfigItem("Summary", "PromptTemplateLecture", "")
+    summary_prompt_template_interview = ConfigItem("Summary", "PromptTemplateInterview", "")
+    summary_prompt_template_general = ConfigItem("Summary", "PromptTemplateGeneral", "")
     auto_summary = ConfigItem("Summary", "AutoSummary", True, BoolValidator())
 
     # ── 笔记配置 ───────────────────────────────────────────────

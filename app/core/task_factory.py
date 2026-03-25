@@ -107,6 +107,10 @@ class TaskFactory:
             llm_api_key=api_key,
             llm_model=model,
             custom_prompt=cfg.summary_custom_prompt.value,
+            prompt_template_meeting=cfg.summary_prompt_template_meeting.value,
+            prompt_template_lecture=cfg.summary_prompt_template_lecture.value,
+            prompt_template_interview=cfg.summary_prompt_template_interview.value,
+            prompt_template_general=cfg.summary_prompt_template_general.value,
             chunk_size=cfg.summary_chunk_size.value,
             prompts_path=str(PROMPTS_PATH),
         )
