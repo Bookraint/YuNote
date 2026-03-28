@@ -17,8 +17,6 @@ ROOT_PATH = Path(__file__).parent.parent
 
 RESOURCE_PATH = ROOT_PATH / "resource"
 APPDATA_PATH = ROOT_PATH / "AppData"
-WORK_PATH = ROOT_PATH / "work-dir"
-
 BIN_PATH = RESOURCE_PATH / "bin"
 ASSETS_PATH = RESOURCE_PATH / "assets"
 PROMPTS_PATH = RESOURCE_PATH / "prompts"
@@ -43,5 +41,5 @@ os.environ["PATH"] = str(FASTER_WHISPER_PATH) + os.pathsep + os.environ["PATH"]
 os.environ["PATH"] = str(BIN_PATH) + os.pathsep + os.environ["PATH"]
 
 # 创建必要目录
-for p in [LOG_PATH, WORK_PATH, MODEL_PATH, NOTES_PATH, EXPORT_PATH, CACHE_PATH]:
+for p in [LOG_PATH, MODEL_PATH, NOTES_PATH, EXPORT_PATH, CACHE_PATH]:
     p.mkdir(parents=True, exist_ok=True)

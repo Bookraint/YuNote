@@ -22,7 +22,6 @@ from app.core.constant import INFOBAR_DURATION_FOREVER
 from app.thread.version_checker_thread import VersionChecker
 from app.view.history_interface import HistoryInterface
 from app.view.home_interface import HomeInterface
-from app.view.llm_logs_interface import LLMLogsInterface
 from app.view.note_interface import NoteInterface
 from app.view.setting_interface import SettingInterface
 
@@ -37,7 +36,6 @@ class MainWindow(FluentWindow):
         self.homeInterface = HomeInterface(self)
         self.noteInterface = NoteInterface(self)
         self.historyInterface = HistoryInterface(self)
-        self.llmLogsInterface = LLMLogsInterface(self)
         self.settingInterface = SettingInterface(self)
 
         # 版本检查
@@ -62,7 +60,6 @@ class MainWindow(FluentWindow):
         self.addSubInterface(self.homeInterface,    FIF.HOME,      "主页")
         self.addSubInterface(self.noteInterface,    FIF.DOCUMENT,  "笔记")
         self.addSubInterface(self.historyInterface, FIF.HISTORY,   "历史")
-        self.addSubInterface(self.llmLogsInterface, FIF.SEARCH,    "请求日志")
 
         self.navigationInterface.addSeparator()
 

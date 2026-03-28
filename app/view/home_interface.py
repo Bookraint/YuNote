@@ -2,7 +2,6 @@
 主页：音频文件导入 + 处理进度展示
 流程：导入音频 → 音频预处理 → 转录 → 总结 → 跳转笔记页
 """
-import shutil
 from pathlib import Path
 
 from PyQt5.QtCore import Qt, QThread, pyqtSlot
@@ -31,7 +30,7 @@ from qfluentwidgets import (
 
 from app.common.config import cfg
 from app.common.signal_bus import signalBus
-from app.config import NOTES_PATH, WORK_PATH
+from app.config import NOTES_PATH
 from app.core.entities import NoteSceneEnum, TaskStatusEnum
 from app.core.notes import NoteManager
 from app.core.task_factory import TaskFactory
@@ -231,9 +230,10 @@ class HomeInterface(QWidget):
         self._note_manager.create(note)
         self._note_id = note.note_id
 
-        # 预处理音频
+        # 预处理音频（中间 WAV 与笔记同目录，完成后可删）
         self._stage_label.setText("音频预处理中…")
-        wav_path = prepare_audio(self._audio_path, str(WORK_PATH), self._note_id)
+        note_dir = Path(cfg.notes_dir.value) / self._note_id
+        wav_path = prepare_audio(self._audio_path, str(note_dir))
         if not wav_path:
             self._on_error("音频预处理失败，请确认文件完整且已安装 ffmpeg")
             return
@@ -307,11 +307,11 @@ class HomeInterface(QWidget):
         self._stage_label.setText("处理完成！")
         self._browse_btn.setEnabled(True)
 
-        # 清理中间文件
+        # 删除笔记目录内的预处理 WAV（转录已完成，默认不保留）
         if not cfg.keep_work_files.value:
-            work_note_dir = Path(WORK_PATH) / self._note_id
-            if work_note_dir.exists():
-                shutil.rmtree(work_note_dir, ignore_errors=True)
+            wav = Path(cfg.notes_dir.value) / self._note_id / "audio.wav"
+            if wav.exists():
+                wav.unlink(missing_ok=True)
 
         InfoBar.success(
             "处理完成",

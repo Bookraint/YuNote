@@ -3,9 +3,34 @@ from app.core.asr.bcut import BcutASR
 from app.core.asr.chunked_asr import ChunkedASR
 from app.core.asr.faster_whisper import FasterWhisperASR
 from app.core.asr.jianying import JianYingASR
+from app.core.asr.elevenlabs import ElevenLabsASR
 from app.core.asr.whisper_api import WhisperAPI
 from app.core.asr.whisper_cpp import WhisperCppASR
 from app.core.entities import TranscribeConfig, TranscribeModelEnum
+
+
+def _chunked_kwargs_cloud(config: TranscribeConfig) -> dict:
+    """云端 / 远程 API 分块参数（并发、限流、重试）。"""
+    chunk_sec = max(60, config.transcribe_chunk_length_minutes * 60)
+    conc = max(1, config.transcribe_max_concurrent_chunks)
+    if not config.transcribe_enable_async:
+        conc = 1
+    return {
+        "chunk_length": chunk_sec,
+        "chunk_concurrency": conc,
+        "enable_async": config.transcribe_enable_async,
+        "max_retries": max(1, config.transcribe_chunk_max_retries),
+        "rate_limit_per_minute": max(0, config.transcribe_api_rate_limit_per_minute),
+        "split_threshold_minutes": config.transcribe_split_threshold_minutes,
+    }
+
+
+def _chunked_kwargs_local(config: TranscribeConfig) -> dict:
+    """本地引擎：单块并发，不限流，其余与配置一致。"""
+    kw = _chunked_kwargs_cloud(config)
+    kw["chunk_concurrency"] = 1
+    kw["rate_limit_per_minute"] = 0
+    return kw
 
 
 def transcribe(audio_path: str, config: TranscribeConfig, callback=None) -> ASRData:
@@ -66,6 +91,9 @@ def _create_asr_instance(audio_path: str, config: TranscribeConfig) -> ChunkedAS
     elif model_type == TranscribeModelEnum.WHISPER_API:
         return _create_whisper_api_asr(audio_path, config)
 
+    elif model_type == TranscribeModelEnum.ELEVENLABS:
+        return _create_elevenlabs_asr(audio_path, config)
+
     elif model_type == TranscribeModelEnum.FASTER_WHISPER:
         return _create_faster_whisper_asr(audio_path, config)
 
@@ -80,7 +108,10 @@ def _create_jianying_asr(audio_path: str, config: TranscribeConfig) -> ChunkedAS
         "need_word_time_stamp": config.need_word_time_stamp,
     }
     return ChunkedASR(
-        asr_class=JianYingASR, audio_path=audio_path, asr_kwargs=asr_kwargs
+        asr_class=JianYingASR,
+        audio_path=audio_path,
+        asr_kwargs=asr_kwargs,
+        **_chunked_kwargs_cloud(config),
     )
 
 
@@ -90,7 +121,12 @@ def _create_bijian_asr(audio_path: str, config: TranscribeConfig) -> ChunkedASR:
         "use_cache": True,
         "need_word_time_stamp": config.need_word_time_stamp,
     }
-    return ChunkedASR(asr_class=BcutASR, audio_path=audio_path, asr_kwargs=asr_kwargs)
+    return ChunkedASR(
+        asr_class=BcutASR,
+        audio_path=audio_path,
+        asr_kwargs=asr_kwargs,
+        **_chunked_kwargs_cloud(config),
+    )
 
 
 def _create_whisper_cpp_asr(audio_path: str, config: TranscribeConfig) -> ChunkedASR:
@@ -105,8 +141,7 @@ def _create_whisper_cpp_asr(audio_path: str, config: TranscribeConfig) -> Chunke
         asr_class=WhisperCppASR,
         audio_path=audio_path,
         asr_kwargs=asr_kwargs,
-        chunk_concurrency=1,  # 本地转录使用单线程
-        chunk_length=60 * 20,  # 每块20分钟
+        **_chunked_kwargs_local(config),
     )
 
 
@@ -122,7 +157,28 @@ def _create_whisper_api_asr(audio_path: str, config: TranscribeConfig) -> Chunke
         "prompt": config.whisper_api_prompt or "",
     }
     return ChunkedASR(
-        asr_class=WhisperAPI, audio_path=audio_path, asr_kwargs=asr_kwargs
+        asr_class=WhisperAPI,
+        audio_path=audio_path,
+        asr_kwargs=asr_kwargs,
+        **_chunked_kwargs_cloud(config),
+    )
+
+
+def _create_elevenlabs_asr(audio_path: str, config: TranscribeConfig) -> ChunkedASR:
+    """Create ElevenLabs Scribe ASR instance with chunking support."""
+    asr_kwargs = {
+        "use_cache": True,
+        "need_word_time_stamp": config.need_word_time_stamp,
+        "language": config.transcribe_language,
+        "model_id": config.elevenlabs_model_id or "scribe_v1",
+        "diarize": config.elevenlabs_diarize,
+        "tag_audio_events": config.elevenlabs_tag_audio_events,
+    }
+    return ChunkedASR(
+        asr_class=ElevenLabsASR,
+        audio_path=audio_path,
+        asr_kwargs=asr_kwargs,
+        **_chunked_kwargs_cloud(config),
     )
 
 
@@ -153,8 +209,7 @@ def _create_faster_whisper_asr(audio_path: str, config: TranscribeConfig) -> Chu
         asr_class=FasterWhisperASR,
         audio_path=audio_path,
         asr_kwargs=asr_kwargs,
-        chunk_concurrency=1,  # 本地转录使用单线程
-        chunk_length=60 * 20,  # 每块20分钟
+        **_chunked_kwargs_local(config),
     )
 
 

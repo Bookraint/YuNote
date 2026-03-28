@@ -1,9 +1,11 @@
 """
 笔记的 CRUD 操作。
 每条笔记对应 AppData/notes/{note_id}/ 目录：
-  meta.json        — 元数据
+
+  meta.json        — 笔记索引（标题、场景、时间、状态、模型等）；列表/打开笔记依赖此文件
   transcript.txt   — 转录原文
   summary.md       — AI 总结
+  audio.wav        — 可选；需格式转换时生成的中间文件，处理完默认删除
 """
 import json
 from datetime import datetime

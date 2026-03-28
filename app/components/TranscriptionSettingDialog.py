@@ -13,6 +13,7 @@ from qfluentwidgets import FluentIcon as FIF
 from app.common.config import cfg
 from app.components.EditComboBoxSettingCard import EditComboBoxSettingCard
 from app.components.LineEditSettingCard import LineEditSettingCard
+from app.components.ChunkConcurrencySettingDialog import ChunkConcurrencySettingDialog
 from app.components.SpinBoxSettingCard import SpinBoxSettingCard
 from app.core.constant import INFOBAR_DURATION_ERROR, INFOBAR_DURATION_SUCCESS
 from app.core.entities import TranscribeModelEnum, TranscribeOutputFormatEnum
@@ -130,8 +131,20 @@ class TranscriptionSettingDialog(MessageBoxBase):
         separator.setFrameShape(QFrame.HLine)
         separator.setFrameShadow(QFrame.Sunken)
 
+        self.chunk_concurrency_card = PushSettingCard(
+            self.tr("打开"),
+            FIF.SYNC,
+            self.tr("并发与分块（长音频）"),
+            self.tr("并发、重试、限流、切分阈值；减轻 API 压力"),
+            self,
+        )
+        self.chunk_concurrency_card.clicked.connect(
+            lambda: ChunkConcurrencySettingDialog(self.window()).exec_()
+        )
+
         self.viewLayout.addWidget(self.titleLabel)
         self.viewLayout.addWidget(self.output_format_card)
+        self.viewLayout.addWidget(self.chunk_concurrency_card)
         self.viewLayout.addWidget(separator)
         self.viewLayout.addWidget(self.whisperApiBaseCard)
         self.viewLayout.addWidget(self.whisperApiKeyCard)

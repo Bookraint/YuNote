@@ -1,15 +1,18 @@
 """
 Map-Reduce 两阶段总结。
 
-阶段一（Map）：将长转录文本分块，每块独立生成摘要（顺序执行，避免并发超限）。
+阶段一（Map）：将长转录文本分块，每块独立生成摘要；可按配置并发请求，并受 RPM 限制。
 阶段二（Reduce）：将所有块摘要合并，再次调用 LLM 生成最终结构化笔记。
 
 若文本较短（< chunk_size），直接单次完成。
 """
 from __future__ import annotations
 
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, List, Optional, cast
 
 from openai import OpenAI
 
@@ -69,14 +72,8 @@ class Summarizer:
             _cb(100, "总结完成")
             return result
 
-        # Map 阶段
-        chunk_summaries: list[str] = []
-        for i, chunk in enumerate(chunks):
-            pct = int(10 + (i / len(chunks)) * 60)
-            _cb(pct, f"分析片段 {i + 1}/{len(chunks)}…")
-            chunk_summary = self._map_chunk(chunk)
-            chunk_summaries.append(chunk_summary)
-            logger.debug("片段 %d 摘要长度: %d", i + 1, len(chunk_summary))
+        # Map 阶段（可并发 + RPM）
+        chunk_summaries = self._map_chunks_parallel(chunks, _cb)
 
         # Reduce 阶段
         _cb(75, "整合生成最终总结…")
@@ -86,6 +83,65 @@ class Summarizer:
         result = self._reduce(merged)
         _cb(100, "总结完成")
         return result
+
+    def _map_chunks_parallel(
+        self,
+        chunks: List[str],
+        _cb: Callable[[int, str], None],
+    ) -> List[str]:
+        """Map 阶段：顺序或线程池并发，共享 RPM 滑动窗口。"""
+        n = len(chunks)
+        workers = max(1, min(self.config.map_concurrency, n))
+        rpm_times: List[float] = []
+        rpm_lock = threading.Lock()
+        progress_lock = threading.Lock()
+        completed = 0
+
+        def wait_rpm() -> None:
+            limit = self.config.map_rpm
+            if limit <= 0:
+                return
+            window = 60.0
+            while True:
+                with rpm_lock:
+                    now = time.time()
+                    rpm_times[:] = [t for t in rpm_times if now - t < window]
+                    if len(rpm_times) < limit:
+                        rpm_times.append(time.time())
+                        return
+                    wait = window - (now - rpm_times[0])
+                if wait > 0:
+                    time.sleep(wait)
+                else:
+                    time.sleep(0.05)
+
+        def map_one(idx: int, chunk: str) -> tuple[int, str]:
+            wait_rpm()
+            summary = self._map_chunk(chunk)
+            nonlocal completed
+            with progress_lock:
+                completed += 1
+                pct = int(10 + (completed / n) * 60)
+                _cb(pct, f"分析片段 {completed}/{n}…")
+            return idx, summary
+
+        if workers == 1:
+            ordered: List[str] = []
+            for i, ch in enumerate(chunks):
+                _, s = map_one(i, ch)
+                ordered.append(s)
+                logger.debug("片段 %d 摘要长度: %d", i + 1, len(s))
+            return ordered
+
+        slot: List[Optional[str]] = [None] * n
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = {ex.submit(map_one, i, c): i for i, c in enumerate(chunks)}
+            for fut in as_completed(futures):
+                idx, summary = fut.result()
+                slot[idx] = summary
+                logger.debug("片段 %d 摘要长度: %d", idx + 1, len(summary))
+
+        return cast(List[str], slot)
 
     def _single_pass(self, text: str) -> str:
         """文本较短时直接单次生成。"""

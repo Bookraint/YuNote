@@ -168,12 +168,39 @@ class Config(QConfig):
         "WhisperAPI", "VadSpeechPadMs", 600, RangeValidator(0, 2000)
     )
 
+    # ElevenLabs Scribe（无 Key，allow_unauthenticated）
+    elevenlabs_model_id = ConfigItem("ElevenLabs", "ModelId", "scribe_v1")
+    elevenlabs_diarize = ConfigItem("ElevenLabs", "Diarize", True, BoolValidator())
+    elevenlabs_tag_audio_events = ConfigItem(
+        "ElevenLabs", "TagAudioEvents", False, BoolValidator()
+    )
+
     # 转录输出格式（供 WhisperAPI / TranscriptionSettingDialog 使用）
     transcribe_output_format = OptionsConfigItem(
         "Transcribe", "OutputFormat",
         TranscribeOutputFormatEnum.TXT,
         OptionsValidator(TranscribeOutputFormatEnum),
         EnumSerializer(TranscribeOutputFormatEnum),
+    )
+    # 长音频分块 / 并发（对齐 scribe2srt，减轻 API 压力）
+    transcribe_enable_async = ConfigItem(
+        "Transcribe", "EnableAsyncChunk", True, BoolValidator()
+    )
+    transcribe_max_concurrent_chunks = RangeConfigItem(
+        "Transcribe", "MaxConcurrentChunks", 3, RangeValidator(1, 16)
+    )
+    transcribe_chunk_max_retries = RangeConfigItem(
+        "Transcribe", "ChunkMaxRetries", 3, RangeValidator(1, 10)
+    )
+    transcribe_api_rate_limit_per_minute = RangeConfigItem(
+        "Transcribe", "ApiRateLimitPerMinute", 30, RangeValidator(0, 120)
+    )
+    # 0 = 不启用「短于该时长则整段转录」；大于 0 时，总时长不超过该分钟数则只发一块
+    transcribe_split_threshold_minutes = RangeConfigItem(
+        "Transcribe", "SplitThresholdMinutes", 90, RangeValidator(0, 600)
+    )
+    transcribe_chunk_length_minutes = RangeConfigItem(
+        "Transcribe", "ChunkLengthMinutes", 20, RangeValidator(5, 120)
     )
 
     # ── 总结配置 ───────────────────────────────────────────────
@@ -185,6 +212,13 @@ class Config(QConfig):
     )
     summary_chunk_size = RangeConfigItem(
         "Summary", "ChunkSize", 4000, RangeValidator(1000, 10000)
+    )
+    # Map 阶段：多片段并行调用 LLM；0 表示不限制 RPM
+    summary_map_concurrency = RangeConfigItem(
+        "Summary", "MapConcurrency", 3, RangeValidator(1, 16)
+    )
+    summary_map_rpm = RangeConfigItem(
+        "Summary", "MapRpm", 60, RangeValidator(0, 500)
     )
     summary_custom_prompt = ConfigItem("Summary", "CustomPrompt", "")
     summary_prompt_template_meeting = ConfigItem("Summary", "PromptTemplateMeeting", "")

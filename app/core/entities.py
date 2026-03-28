@@ -55,6 +55,7 @@ class LLMServiceEnum(Enum):
 class TranscribeModelEnum(Enum):
     BIJIAN        = "B 接口"
     JIANYING      = "J 接口"
+    ELEVENLABS    = "ElevenLabs Scribe ✨"
     WHISPER_API   = "Whisper [API] ✨"
     FASTER_WHISPER = "FasterWhisper ✨"
     WHISPER_CPP   = "WhisperCpp"
@@ -229,6 +230,10 @@ ASR_LANGUAGE_CAPABILITIES: dict[TranscribeModelEnum, ASRLanguageCapability] = {
         supported_languages=_get_all_languages_except_auto(),
         supports_auto=True,
     ),
+    TranscribeModelEnum.ELEVENLABS: ASRLanguageCapability(
+        supported_languages=_get_all_languages_except_auto(),
+        supports_auto=True,
+    ),
 }
 
 
@@ -265,6 +270,17 @@ class TranscribeConfig:
     faster_whisper_ff_mdx_kim2: bool = False
     faster_whisper_one_word: bool = True
     faster_whisper_prompt: Optional[str] = None
+    # ElevenLabs Scribe（allow_unauthenticated，无 API Key）
+    elevenlabs_model_id: str = "scribe_v1"
+    elevenlabs_diarize: bool = True
+    elevenlabs_tag_audio_events: bool = False
+    # 分块 / 并发 / 限流（长音频）
+    transcribe_enable_async: bool = True
+    transcribe_max_concurrent_chunks: int = 3
+    transcribe_chunk_max_retries: int = 3
+    transcribe_api_rate_limit_per_minute: int = 30
+    transcribe_split_threshold_minutes: int = 90
+    transcribe_chunk_length_minutes: int = 20
 
     def _mask_key(self, key: Optional[str]) -> str:
         if not key or len(key) <= 12:
@@ -279,10 +295,21 @@ class TranscribeConfig:
             lines.append(f"API Base: {self.whisper_api_base}")
             lines.append(f"API Key: {self._mask_key(self.whisper_api_key)}")
             lines.append(f"API Model: {self.whisper_api_model}")
+        elif self.transcribe_model == TranscribeModelEnum.ELEVENLABS:
+            lines.append(f"ElevenLabs Model: {self.elevenlabs_model_id}")
+            lines.append(f"Diarize: {self.elevenlabs_diarize}")
         elif self.transcribe_model == TranscribeModelEnum.FASTER_WHISPER:
             lines.append(f"FW Model: {self.faster_whisper_model.value if self.faster_whisper_model else 'None'}")
             lines.append(f"Device: {self.faster_whisper_device}")
             lines.append(f"VAD: {self.faster_whisper_vad_filter}")
+        lines.append(
+            f"Chunk: async={self.transcribe_enable_async}, "
+            f"concurrent={self.transcribe_max_concurrent_chunks}, "
+            f"retries={self.transcribe_chunk_max_retries}, "
+            f"rate_limit={self.transcribe_api_rate_limit_per_minute}/min, "
+            f"split_threshold={self.transcribe_split_threshold_minutes}min, "
+            f"chunk_len={self.transcribe_chunk_length_minutes}min"
+        )
         lines.append("=" * 44)
         return "\n".join(lines)
 
@@ -318,6 +345,8 @@ class SummaryConfig:
     prompt_template_interview: str = ""
     prompt_template_general: str = ""
     chunk_size: int = 4000          # 单块最大字符数（Map-Reduce 分块）
+    map_concurrency: int = 3       # Map 阶段同时请求数（1=顺序）
+    map_rpm: int = 60              # Map 阶段 API 每分钟请求上限；0=不限
     prompts_path: str = ""          # resource/prompts/ 路径
 
     def _mask_key(self, key: str) -> str:
@@ -332,6 +361,7 @@ class SummaryConfig:
         lines.append(f"API Base: {self.llm_base_url}")
         lines.append(f"API Key: {self._mask_key(self.llm_api_key)}")
         lines.append(f"Chunk Size: {self.chunk_size}")
+        lines.append(f"Map Concurrency: {self.map_concurrency}, RPM: {self.map_rpm}")
         lines.append("=" * 38)
         return "\n".join(lines)
 
@@ -356,8 +386,8 @@ class SummaryTask:
 class Note:
     """
     一条笔记的完整元数据。
-    持久化为 AppData/notes/{note_id}/meta.json。
-    转录文本和总结以独立文件存储于同一目录。
+    note_id 与目录名一致，形如「音频主文件名_YYYYMMDD_HHMMSS」。
+    meta.json 保存可检索字段（标题、场景、状态等），与 transcript/summary 分离，便于列表与增量更新。
     """
     note_id: str = field(default_factory=_generate_task_id)
     title: str = ""

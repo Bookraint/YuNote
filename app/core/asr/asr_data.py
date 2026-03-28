@@ -99,6 +99,22 @@ class ASRDataSeg:
         """Return segment text"""
         return self.text
 
+    @staticmethod
+    def _format_ms_clock(ms: int) -> str:
+        """毫秒转为可读时钟：不足 1 小时为 MM:SS，否则 H:MM:SS。"""
+        total_seconds, _ = divmod(ms, 1000)
+        h, rem = divmod(total_seconds, 3600)
+        m, s = divmod(rem, 60)
+        if h > 0:
+            return f"{h}:{m:02d}:{s:02d}"
+        return f"{m:02d}:{s:02d}"
+
+    def to_plain_timestamp_label(self) -> str:
+        """供纯文本原文展示，例如 [00:12:34–00:12:50]（与 speaker 等前缀可同列）。"""
+        a = self._format_ms_clock(self.start_time)
+        b = self._format_ms_clock(self.end_time)
+        return f"[{a}–{b}]"
+
     def __str__(self) -> str:
         return f"ASRDataSeg({self.text}, {self.start_time}, {self.end_time})"
 
@@ -118,6 +134,12 @@ class ASRData:
     def has_data(self) -> bool:
         """Check if there are any utterances"""
         return len(self.segments) > 0
+
+    def transcript_time_span_ms(self) -> int:
+        """首条开始至末条结束的时间跨度（毫秒），用于展示字幕覆盖的内容时长。"""
+        if not self.segments:
+            return 0
+        return max(0, self.segments[-1].end_time - self.segments[0].start_time)
 
     def _is_word_level_segment(self, segment: ASRDataSeg) -> bool:
         """判断单个片段是否为词级
@@ -245,12 +267,24 @@ class ASRData:
         else:
             raise ValueError(f"Unsupported file extension: {save_path}")
 
+    @staticmethod
+    def _prefix_first_line(block: str, prefix: str) -> str:
+        """在块的首行前加前缀（多行时只改第一行）。"""
+        if not prefix:
+            return block
+        lines = block.split("\n")
+        if not lines:
+            return prefix + block
+        lines[0] = prefix + lines[0]
+        return "\n".join(lines)
+
     def to_txt(
         self,
         save_path=None,
         layout: SubtitleLayoutEnum = SubtitleLayoutEnum.ORIGINAL_ON_TOP,
+        include_timestamps: bool = False,
     ) -> str:
-        """Convert to plain text subtitle format (without timestamps)"""
+        """转为纯文本；可选在每段首行前附加起止时间，便于与 speaker 等标记同屏阅读。"""
         result = []
         for seg in self.segments:
             original = seg.text
@@ -264,6 +298,9 @@ class ASRData:
                 text = original
             else:  # ONLY_TRANSLATE
                 text = translated if translated else original
+            if include_timestamps:
+                ts = seg.to_plain_timestamp_label() + " "
+                text = self._prefix_first_line(text, ts)
             result.append(text)
         text = "\n".join(result)
         if save_path:

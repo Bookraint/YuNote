@@ -35,24 +35,16 @@ head:
 
 ### macOS / Linux 用户
 
-#### 使用自动安装脚本（推荐）
+#### 从源码运行（推荐）
 
 ```bash
-# 1. 克隆项目
-git clone https://github.com/WEIFENG2333/VideoCaptioner.git
-cd VideoCaptioner
-
-# 2. 运行安装脚本
-chmod +x run.sh
-./run.sh
+git clone <本仓库地址> YuNote
+cd YuNote
+uv sync
+uv run python main.py
 ```
 
-脚本会自动：
-
-- 检测 Python 环境
-- 创建虚拟环境并安装依赖
-- 检测系统工具（ffmpeg、aria2）
-- 启动应用程序
+需已安装 [uv](https://docs.astral.sh/uv/)，并安装 **ffmpeg**（如 `brew install ffmpeg`）。
 
 ::: tip 提示
 macOS 用户需要先安装 [Homebrew](https://brew.sh/)
@@ -85,8 +77,8 @@ sudo dnf install ffmpeg aria2 python3.11
 **2. 克隆项目并安装 Python 依赖**
 
 ```bash
-git clone https://github.com/WEIFENG2333/VideoCaptioner.git
-cd VideoCaptioner
+git clone <本仓库地址> YuNote
+cd YuNote
 
 # 创建虚拟环境
 python3.11 -m venv venv

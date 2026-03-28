@@ -6,11 +6,13 @@
 
 import io
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable, List, Optional, Tuple
 
 from pydub import AudioSegment
 
+from ..utils.audio_utils import format_duration
 from ..utils.logger import setup_logger
 from .asr_data import ASRData
 from .base import BaseASR
@@ -63,17 +65,46 @@ class ChunkedASR:
         chunk_length: int = DEFAULT_CHUNK_LENGTH_SEC,
         chunk_overlap: int = DEFAULT_CHUNK_OVERLAP_SEC,
         chunk_concurrency: int = DEFAULT_CHUNK_CONCURRENCY,
+        enable_async: bool = True,
+        max_retries: int = 3,
+        rate_limit_per_minute: int = 0,
+        split_threshold_minutes: int = 0,
     ):
         self.asr_class = asr_class
         self.audio_path = audio_path
         self.asr_kwargs = asr_kwargs or {}
         self.chunk_length_ms = chunk_length * MS_PER_SECOND
         self.chunk_overlap_ms = chunk_overlap * MS_PER_SECOND
-        self.chunk_concurrency = chunk_concurrency
+        self.chunk_concurrency = max(1, chunk_concurrency)
+        self.enable_async = enable_async
+        self.max_retries = max(1, max_retries)
+        self.rate_limit_per_minute = max(0, rate_limit_per_minute)
+        self.split_threshold_minutes = max(0, split_threshold_minutes)
+        self._rate_times: list[float] = []
+        self._rate_lock = threading.Lock()
 
         # 读取完整音频文件（用于分块）
         with open(audio_path, "rb") as f:
             self.file_binary = f.read()
+
+    def _wait_rate_limit(self) -> None:
+        """每分钟最多 rate_limit_per_minute 次请求（滑动窗口）；0 表示不限流。"""
+        if self.rate_limit_per_minute <= 0:
+            return
+        window = 60.0
+        limit = self.rate_limit_per_minute
+        while True:
+            with self._rate_lock:
+                now = time.time()
+                self._rate_times = [t for t in self._rate_times if now - t < window]
+                if len(self._rate_times) < limit:
+                    self._rate_times.append(time.time())
+                    return
+                wait = window - (now - self._rate_times[0])
+            if wait > 0:
+                time.sleep(wait)
+            else:
+                time.sleep(0.05)
 
     def run(self, callback: Optional[Callable[[int, str], None]] = None) -> ASRData:
         """执行分块转录
@@ -91,7 +122,9 @@ class ChunkedASR:
         if len(chunks) == 1:
             logger.info("音频短于分块长度，直接转录")
             single_asr = self.asr_class(self.audio_path, **self.asr_kwargs)
-            return single_asr.run(callback)
+            merged_result = single_asr.run(callback)
+            self._log_transcribe_done(merged_result, n_chunks=1)
+            return merged_result
 
         logger.info(f"音频分为 {len(chunks)} 块，开始并发转录")
 
@@ -101,8 +134,18 @@ class ChunkedASR:
         # 4. 合并结果
         merged_result = self._merge_results(chunk_results, chunks)
 
-        logger.info(f"分块转录完成，共 {len(merged_result.segments)} 个片段")
+        self._log_transcribe_done(merged_result, n_chunks=len(chunks))
         return merged_result
+
+    def _log_transcribe_done(self, merged_result: ASRData, n_chunks: int) -> None:
+        """片段数 = 引擎输出的字幕/话语条数，不是音频分块数。"""
+        n_seg = len(merged_result.segments)
+        span_sec = merged_result.transcript_time_span_ms() / 1000.0
+        span_str = format_duration(span_sec) if span_sec > 0 else "—"
+        logger.info(
+            f"分块转录完成：音频分块 {n_chunks}，合并后共 {n_seg} 条字幕"
+            f"（引擎按句/段切分）；内容时间跨度约 {span_str}"
+        )
 
     def _split_audio(self) -> List[Tuple[bytes, int]]:
         """使用 pydub 将音频切割为重叠的块
@@ -123,6 +166,16 @@ class ChunkedASR:
             f"分块长度: {self.chunk_length_ms/1000:.1f}s, "
             f"重叠: {self.chunk_overlap_ms/1000:.1f}s"
         )
+
+        if self.split_threshold_minutes > 0:
+            threshold_ms = self.split_threshold_minutes * 60 * MS_PER_SECOND
+            if total_duration_ms <= threshold_ms:
+                buffer = io.BytesIO()
+                audio.export(buffer, format="mp3")
+                logger.info(
+                    f"时长不超过切分阈值 {self.split_threshold_minutes} 分钟，整段转录"
+                )
+                return [(buffer.getvalue(), 0)]
 
         chunks = []
         start_ms = 0
@@ -178,7 +231,7 @@ class ChunkedASR:
         ) -> Tuple[int, ASRData]:
             """转录单个音频块 - 为每个块创建独立的 ASR 实例"""
             nonlocal last_overall
-            logger.info(f"开始转录 chunk {idx+1}/{total_chunks} (offset={offset_ms}ms)")
+            logger.debug(f"开始转录 chunk {idx+1}/{total_chunks} (offset={offset_ms}ms)")
 
             def chunk_callback(progress: int, message: str):
                 nonlocal last_overall
@@ -192,20 +245,36 @@ class ChunkedASR:
                         last_overall = overall
                         callback(overall, f"{idx+1}/{total_chunks}: {message}")
 
-            # 为当前 chunk 创建独立的 ASR 实例
-            # 使用 chunk_bytes 作为音频输入
-            chunk_asr = self.asr_class(chunk_bytes, **self.asr_kwargs)
+            last_err: Optional[Exception] = None
+            for attempt in range(self.max_retries):
+                try:
+                    self._wait_rate_limit()
+                    chunk_asr = self.asr_class(chunk_bytes, **self.asr_kwargs)
+                    asr_data = chunk_asr.run(chunk_callback)
+                    logger.debug(
+                        f"Chunk {idx+1}/{total_chunks} 转录完成，"
+                        f"本块 {len(asr_data.segments)} 条（合并后条数见汇总日志）"
+                    )
+                    return idx, asr_data
+                except Exception as e:
+                    last_err = e
+                    logger.warning(
+                        f"Chunk {idx+1}/{total_chunks} 第 {attempt + 1}/"
+                        f"{self.max_retries} 次失败: {e}"
+                    )
+                    if attempt < self.max_retries - 1:
+                        time.sleep(min(2.0**attempt, 30.0))
 
-            # 调用 ASR 的 run() 方法转录
-            asr_data = chunk_asr.run(chunk_callback)
+            assert last_err is not None
+            raise last_err
 
-            logger.info(
-                f"Chunk {idx+1}/{total_chunks} 转录完成，"
-                f"获得 {len(asr_data.segments)} 个片段"
-            )
-            return idx, asr_data
+        if not self.enable_async:
+            for i, (chunk_bytes, offset) in enumerate(chunks):
+                idx, asr_data = transcribe_single_chunk(i, chunk_bytes, offset)
+                results[idx] = asr_data
+            logger.debug(f"所有 {total_chunks} 个块转录完成（顺序模式）")
+            return [r for r in results if r is not None]
 
-        # 使用 ThreadPoolExecutor 并发转录
         with ThreadPoolExecutor(max_workers=self.chunk_concurrency) as executor:
             futures = {
                 executor.submit(transcribe_single_chunk, i, chunk_bytes, offset): i
@@ -216,7 +285,7 @@ class ChunkedASR:
                 idx, asr_data = future.result()
                 results[idx] = asr_data
 
-        logger.info(f"所有 {total_chunks} 个块转录完成")
+        logger.debug(f"所有 {total_chunks} 个块转录完成")
         return [r for r in results if r is not None]  # 过滤 None
 
     def _merge_results(

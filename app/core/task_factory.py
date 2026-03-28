@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Optional
 
 from app.common.config import cfg
+from app.core.utils.note_id import allocate_note_folder_id
 from app.config import MODEL_PATH, NOTES_PATH, PROMPTS_PATH
 from app.core.entities import (
     LANGUAGES,
@@ -67,6 +68,10 @@ class TaskFactory:
             whisper_api_base=cfg.whisper_api_base.value,
             whisper_api_model=cfg.whisper_api_model.value,
             whisper_api_prompt=cfg.whisper_api_prompt.value,
+            # ElevenLabs
+            elevenlabs_model_id=cfg.elevenlabs_model_id.value,
+            elevenlabs_diarize=cfg.elevenlabs_diarize.value,
+            elevenlabs_tag_audio_events=cfg.elevenlabs_tag_audio_events.value,
             # FasterWhisper
             faster_whisper_program="faster-whisper-xxl.exe",
             faster_whisper_model=cfg.faster_whisper_model.value,
@@ -78,6 +83,12 @@ class TaskFactory:
             faster_whisper_ff_mdx_kim2=False,
             faster_whisper_one_word=cfg.faster_whisper_one_word.value,
             faster_whisper_prompt=cfg.faster_whisper_prompt.value,
+            transcribe_enable_async=cfg.transcribe_enable_async.value,
+            transcribe_max_concurrent_chunks=cfg.transcribe_max_concurrent_chunks.value,
+            transcribe_chunk_max_retries=cfg.transcribe_chunk_max_retries.value,
+            transcribe_api_rate_limit_per_minute=cfg.transcribe_api_rate_limit_per_minute.value,
+            transcribe_split_threshold_minutes=cfg.transcribe_split_threshold_minutes.value,
+            transcribe_chunk_length_minutes=cfg.transcribe_chunk_length_minutes.value,
         )
 
         return TranscribeTask(
@@ -112,6 +123,8 @@ class TaskFactory:
             prompt_template_interview=cfg.summary_prompt_template_interview.value,
             prompt_template_general=cfg.summary_prompt_template_general.value,
             chunk_size=cfg.summary_chunk_size.value,
+            map_concurrency=cfg.summary_map_concurrency.value,
+            map_rpm=cfg.summary_map_rpm.value,
             prompts_path=str(PROMPTS_PATH),
         )
 
@@ -133,7 +146,10 @@ class TaskFactory:
         """创建 Note 元数据对象（不含持久化，由 NoteManager 负责写盘）"""
         base_url, api_key, model = TaskFactory._get_llm_config()
         transcribe_model = cfg.transcribe_model.value
+        notes_root = Path(cfg.notes_dir.value)
+        note_id = allocate_note_folder_id(notes_root, source_audio_name)
         return Note(
+            note_id=note_id,
             title=title,
             scene=scene,
             source_audio_name=source_audio_name,

@@ -120,16 +120,17 @@ def needs_conversion(file_path: str) -> bool:
 
 def prepare_audio(
     input_path: str,
-    work_dir: str,
-    note_id: str,
+    note_dir: str,
 ) -> Optional[str]:
     """
     预处理入口：若需要则转换格式，否则直接返回原路径。
 
+    转换后的 WAV 写在笔记目录内 ``{note_dir}/audio.wav``，与 transcript 同目录，
+    处理完成后可按设置删除，不再使用单独的 work-dir。
+
     Args:
         input_path: 用户导入的原始文件
-        work_dir: 中间文件工作目录
-        note_id: 关联的笔记 ID（用于命名中间文件）
+        note_dir: 笔记目录路径（AppData/notes/{note_id}/）
 
     Returns:
         可直接送入 ASR 的 WAV 文件路径，失败返回 None。
@@ -142,6 +143,7 @@ def prepare_audio(
         logger.info("音频格式无需转换: %s", input_path)
         return input_path
 
-    wav_path = str(Path(work_dir) / note_id / "audio.wav")
+    Path(note_dir).mkdir(parents=True, exist_ok=True)
+    wav_path = str(Path(note_dir) / "audio.wav")
     success = convert_to_wav(input_path, wav_path)
     return wav_path if success else None

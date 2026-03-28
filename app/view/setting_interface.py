@@ -24,6 +24,7 @@ from qfluentwidgets import (
 from app.common.config import cfg
 from app.components.EditComboBoxSettingCard import EditComboBoxSettingCard
 from app.components.LineEditSettingCard import LineEditSettingCard
+from app.components.SpinBoxSettingCard import SpinBoxSettingCard
 from app.components.PromptTemplateEditDialog import PromptTemplateEditDialog
 from app.config import APPDATA_PATH, VERSION, PROMPTS_PATH
 from app.core.entities import LLMServiceEnum, NoteSceneEnum, TranscribeModelEnum
@@ -147,6 +148,9 @@ class SettingInterface(ScrollArea):
     # ── 转录配置 ──────────────────────────────────────────────
 
     def _init_transcribe_group(self):
+        from app.components.ChunkConcurrencySettingDialog import (
+            ChunkConcurrencySettingDialog,
+        )
         from app.components.TranscriptionSettingDialog import TranscriptionSettingDialog
 
         group = SettingCardGroup("转录引擎", self._scroll_widget)
@@ -171,6 +175,18 @@ class SettingInterface(ScrollArea):
         )
         group.addSettingCard(self._transcribe_lang_card)
 
+        self._chunk_concurrency_card = PushSettingCard(
+            "打开",
+            FIF.SYNC,
+            "并发与分块（长音频）",
+            "并发数、重试、API 限流、整段阈值等，避免请求过多导致失败",
+            group,
+        )
+        group.addSettingCard(self._chunk_concurrency_card)
+        self._chunk_concurrency_card.clicked.connect(
+            lambda: ChunkConcurrencySettingDialog(self.window()).exec_()
+        )
+
         self._whisper_api_setting_card = PushSettingCard(
             "打开",
             FIF.SETTING,
@@ -183,7 +199,35 @@ class SettingInterface(ScrollArea):
             lambda: TranscriptionSettingDialog(self.window()).exec_()
         )
 
-        # 仅在 Whisper API 模式下显示入口，避免 B 接口出现大空隙
+        self._elevenlabs_model_card = LineEditSettingCard(
+            cfg.elevenlabs_model_id,
+            FIF.LABEL,
+            "ElevenLabs 模型 ID",
+            content="一般为 scribe_v1",
+            placeholder="scribe_v1",
+            parent=group,
+        )
+        group.addSettingCard(self._elevenlabs_model_card)
+
+        self._elevenlabs_diarize_card = SwitchSettingCard(
+            FIF.PEOPLE,
+            "ElevenLabs 说话人分离",
+            "开启后对转录文本按说话人标注 [speaker_n]（需账户支持）",
+            cfg.elevenlabs_diarize,
+            group,
+        )
+        group.addSettingCard(self._elevenlabs_diarize_card)
+
+        self._elevenlabs_tag_events_card = SwitchSettingCard(
+            FIF.MUSIC,
+            "标记非语音事件",
+            "在结果中标注笑声、掌声等（英文等语言效果更明显）",
+            cfg.elevenlabs_tag_audio_events,
+            group,
+        )
+        group.addSettingCard(self._elevenlabs_tag_events_card)
+
+        # 仅在 Whisper API / ElevenLabs 模式下显示对应入口，避免 B 接口出现大空隙
         def _resolve_transcribe_model() -> TranscribeModelEnum | None:
             raw = cfg.transcribe_model.value
             if isinstance(raw, TranscribeModelEnum):
@@ -199,6 +243,10 @@ class SettingInterface(ScrollArea):
             self._whisper_api_setting_card.setVisible(
                 model == TranscribeModelEnum.WHISPER_API
             )
+            el = model == TranscribeModelEnum.ELEVENLABS
+            self._elevenlabs_model_card.setVisible(el)
+            self._elevenlabs_diarize_card.setVisible(el)
+            self._elevenlabs_tag_events_card.setVisible(el)
             group.adjustSize()
             self._scroll_widget.adjustSize()
             self.viewport().update()
@@ -246,6 +294,28 @@ class SettingInterface(ScrollArea):
             group,
         )
         group.addSettingCard(self._chunk_size_card)
+
+        self._summary_map_concurrency_card = SpinBoxSettingCard(
+            cfg.summary_map_concurrency,
+            FIF.SYNC,
+            "总结 Map 并发数",
+            "长文分多块并行提取要点时，同时发起的 LLM 请求数（1=顺序）",
+            minimum=1,
+            maximum=16,
+            parent=group,
+        )
+        group.addSettingCard(self._summary_map_concurrency_card)
+
+        self._summary_map_rpm_card = SpinBoxSettingCard(
+            cfg.summary_map_rpm,
+            FIF.WIFI,
+            "总结 Map API 限速 (RPM)",
+            "每分钟最多请求次数，避免触发服务商限流；0 表示不限制",
+            minimum=0,
+            maximum=500,
+            parent=group,
+        )
+        group.addSettingCard(self._summary_map_rpm_card)
 
         # 场景模板：点击编辑（避免主页面滚动卡住）
         scene_to_filename = {
@@ -365,8 +435,8 @@ class SettingInterface(ScrollArea):
 
         self._keep_work_card = SwitchSettingCard(
             FIF.SAVE,
-            "保留中间文件",
-            "保留处理过程中生成的临时 WAV 文件",
+            "保留预处理音频",
+            "关闭时处理完成后删除笔记目录内的 audio.wav（格式转换时生成）",
             cfg.keep_work_files,
             group,
         )

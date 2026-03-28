@@ -5,6 +5,7 @@ from PyQt5.QtCore import QThread, pyqtSignal
 
 from app.core.asr import transcribe
 from app.core.entities import TranscribeTask
+from app.core.utils.audio_utils import format_duration
 from app.core.utils.logger import setup_logger
 
 logger = setup_logger("transcribe_thread")
@@ -44,14 +45,28 @@ class TranscribeThread(QThread):
             )
 
             # 保存为纯文本（去除时间戳，只保留文字）
-            text = asr_data.to_txt() if hasattr(asr_data, "to_txt") else str(asr_data)
+            text = (
+                asr_data.to_txt(include_timestamps=True)
+                if hasattr(asr_data, "to_txt")
+                else str(asr_data)
+            )
             output_path.write_text(text, encoding="utf-8")
             # 同时保存一份 SRT 备用
             srt_path = output_path.with_suffix(".srt")
             asr_data.save(str(srt_path))
 
             self.task.completed_at = datetime.datetime.now()
-            self.progress.emit(100, "转录完成")
+            span_sec = asr_data.transcript_time_span_ms() / 1000.0
+            elapsed = (
+                self.task.completed_at - self.task.started_at
+            ).total_seconds()
+            span_txt = format_duration(span_sec) if span_sec > 0 else "—"
+            elapsed_txt = format_duration(elapsed) if elapsed > 0 else "—"
+            done_msg = (
+                f"转录完成 · {len(asr_data)} 条字幕 · 内容约 {span_txt} · 耗时 {elapsed_txt}"
+            )
+            logger.info(done_msg)
+            self.progress.emit(100, done_msg)
             self.finished.emit(self.task)
 
         except Exception as e:

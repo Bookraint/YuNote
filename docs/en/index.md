@@ -100,19 +100,17 @@ features:
 ::: code-group
 
 ```bash [Windows]
-# Download and run the installer directly
-# Or run from source
-git clone https://github.com/WEIFENG2333/VideoCaptioner.git
-cd VideoCaptioner
-run.bat
+git clone <repo-url> YuNote
+cd YuNote
+uv sync
+uv run python main.py
 ```
 
 ```bash [macOS/Linux]
-# Use automatic installation script
-git clone https://github.com/WEIFENG2333/VideoCaptioner.git
-cd VideoCaptioner
-chmod +x run.sh
-./run.sh
+git clone <repo-url> YuNote
+cd YuNote
+uv sync
+uv run python main.py
 ```
 
 :::

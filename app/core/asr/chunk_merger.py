@@ -57,22 +57,22 @@ class ChunkMerger:
             raise ValueError("chunks 不能为空")
 
         if len(chunks) == 1:
-            logger.info("只有一个 chunk，直接返回")
+            logger.debug("只有一个 chunk，直接返回")
             return chunks[0]
 
         # 判断是否为词级时间戳（用于选择匹配策略）
         self._is_word_level = any(chunk.is_word_timestamp() for chunk in chunks)
         if self._is_word_level:
-            logger.info("检测到词级时间戳，使用精确文本匹配")
+            logger.debug("检测到词级时间戳，使用精确文本匹配")
         else:
-            logger.info(
+            logger.debug(
                 f"检测到句子级时间戳，使用模糊匹配（阈值={self.fuzzy_threshold}）"
             )
 
         # 自动推断 offsets
         if chunk_offsets is None:
             chunk_offsets = self._infer_chunk_offsets(chunks, overlap_duration)
-            logger.info(f"自动推断 chunk_offsets: {chunk_offsets}")
+            logger.debug(f"自动推断 chunk_offsets: {chunk_offsets}")
 
         if len(chunks) != len(chunk_offsets):
             raise ValueError(
@@ -88,14 +88,13 @@ class ChunkMerger:
         # 逐对合并
         merged_segments = adjusted_chunks[0]
         for i in range(1, len(adjusted_chunks)):
-            logger.info(f"合并 chunk {i-1} 和 chunk {i}")
+            logger.debug(f"合并 chunk {i-1} 和 chunk {i}")
             merged_segments = self._merge_two_sequences(
                 merged_segments,
                 adjusted_chunks[i],
                 overlap_duration,
             )
 
-        logger.info(f"合并完成，总片段数: {len(merged_segments)}")
         return ASRData(merged_segments)
 
     def _merge_two_sequences(
@@ -131,7 +130,7 @@ class ChunkMerger:
 
         if not left_overlap or not right_overlap:
             # 无重叠，直接拼接
-            logger.info("未检测到重叠区域，直接拼接")
+            logger.debug("未检测到重叠区域，直接拼接")
             return left + right
 
         # 滑动窗口找最佳对齐位置
@@ -147,7 +146,7 @@ class ChunkMerger:
                 if left[i].end_time <= right_start:
                     split_idx = i + 1
                     break
-            logger.info(f"时间边界切分: left[:{split_idx}] + right")
+            logger.debug(f"时间边界切分: left[:{split_idx}] + right")
             return left[:split_idx] + right
 
         # 使用最佳匹配结果
@@ -163,7 +162,7 @@ class ChunkMerger:
         left_overlap_offset = left_len - len(left_overlap)
         left_cut = left_overlap_offset + left_mid
 
-        logger.info(
+        logger.debug(
             f"找到最佳匹配: {matches} 个词, "
             f"重叠区域=[{left_start_idx}:{left_end_idx}] vs [{right_start_idx}:{right_end_idx}], "
             f"切分点: left[:{left_cut}] + right[{right_mid}:]"
