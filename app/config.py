@@ -27,7 +27,6 @@ LLM_LOG_FILE = LOG_PATH / "llm_requests.jsonl"
 SETTINGS_PATH = APPDATA_PATH / "settings.json"
 MODEL_PATH = APPDATA_PATH / "models"
 NOTES_PATH = APPDATA_PATH / "notes"
-EXPORT_PATH = ROOT_PATH / "exports"
 CACHE_PATH = APPDATA_PATH / "cache"
 
 FASTER_WHISPER_PATH = BIN_PATH / "Faster-Whisper-XXL"
@@ -41,5 +40,5 @@ os.environ["PATH"] = str(FASTER_WHISPER_PATH) + os.pathsep + os.environ["PATH"]
 os.environ["PATH"] = str(BIN_PATH) + os.pathsep + os.environ["PATH"]
 
 # 创建必要目录
-for p in [LOG_PATH, MODEL_PATH, NOTES_PATH, EXPORT_PATH, CACHE_PATH]:
+for p in [LOG_PATH, MODEL_PATH, NOTES_PATH, CACHE_PATH]:
     p.mkdir(parents=True, exist_ok=True)

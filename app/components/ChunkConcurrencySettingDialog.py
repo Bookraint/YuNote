@@ -5,6 +5,16 @@ from qfluentwidgets import FluentIcon as FIF
 
 from app.common.config import cfg
 from app.components.SpinBoxSettingCard import SpinBoxSettingCard
+from app.core.entities import TranscribeModelEnum
+
+
+def _is_local_transcribe_engine() -> bool:
+    """WhisperCpp / FasterWhisper：本地推理，transcribe.py 会固定并发=1、不限 API 流。"""
+    m = cfg.transcribe_model.value
+    return m in (
+        TranscribeModelEnum.WHISPER_CPP,
+        TranscribeModelEnum.FASTER_WHISPER,
+    )
 
 
 class ChunkConcurrencySettingDialog(MessageBoxBase):
@@ -43,7 +53,7 @@ class ChunkConcurrencySettingDialog(MessageBoxBase):
             cfg.transcribe_api_rate_limit_per_minute,
             FIF.WIFI,
             self.tr("API 速率限制"),
-            self.tr("每分钟最多请求数；0 表示不限制（本地引擎通常可设 0）"),
+            self.tr("每分钟最多请求数；0 表示不限制（仅云端 / 远程 API 引擎有效）"),
             minimum=0,
             maximum=120,
             parent=self,
@@ -82,9 +92,24 @@ class ChunkConcurrencySettingDialog(MessageBoxBase):
 
         self.viewLayout.addWidget(self.titleLabel)
         self.viewLayout.addWidget(self.enable_async_card)
-        self.viewLayout.addWidget(self.max_concurrent_card)
+
+        if _is_local_transcribe_engine():
+            local_note = BodyLabel(
+                self.tr(
+                    "当前为本地引擎（WhisperCpp / FasterWhisper）：转录在本机执行，不向云端 API 发请求，"
+                    "程序会忽略「API 速率限制」并固定为不限流；长音频分块后亦为单路处理，"
+                    "「最大并发片段数」同样由程序固定，无需调整。切换为云端引擎后，下方两项会重新显示。"
+                ),
+                self,
+            )
+            local_note.setWordWrap(True)
+            local_note.setStyleSheet("color: #aeaeb2; font-size: 12px;")
+            self.viewLayout.addWidget(local_note)
+        else:
+            self.viewLayout.addWidget(self.max_concurrent_card)
+            self.viewLayout.addWidget(self.rate_limit_card)
+
         self.viewLayout.addWidget(self.retries_card)
-        self.viewLayout.addWidget(self.rate_limit_card)
         self.viewLayout.addWidget(self.split_threshold_card)
         self.viewLayout.addWidget(self.chunk_len_card)
         self.viewLayout.addWidget(sep)

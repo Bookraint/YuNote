@@ -18,7 +18,7 @@ from qfluentwidgets import (
     qconfig,
 )
 
-from app.config import EXPORT_PATH, NOTES_PATH, SETTINGS_PATH
+from app.config import NOTES_PATH, SETTINGS_PATH
 from app.core.utils.platform_utils import get_available_transcribe_models
 
 from ..core.entities import (
@@ -229,11 +229,6 @@ class Config(QConfig):
 
     # ── 笔记配置 ───────────────────────────────────────────────
     notes_dir = ConfigItem("Notes", "NotesDir", NOTES_PATH, FolderValidator())
-    export_dir = ConfigItem("Notes", "ExportDir", EXPORT_PATH, FolderValidator())
-    default_export_format = OptionsConfigItem(
-        "Notes", "ExportFormat", "markdown",
-        OptionsValidator(["markdown", "txt", "docx"]),
-    )
     keep_work_files = ConfigItem("Notes", "KeepWorkFiles", False, BoolValidator())
 
     # ── 界面配置 ───────────────────────────────────────────────

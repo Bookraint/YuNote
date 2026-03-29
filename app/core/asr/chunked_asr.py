@@ -126,9 +126,16 @@ class ChunkedASR:
             self._log_transcribe_done(merged_result, n_chunks=1)
             return merged_result
 
-        logger.info(f"音频分为 {len(chunks)} 块，开始并发转录")
+        if self.enable_async:
+            logger.info(
+                f"音频分为 {len(chunks)} 块，开始并发转录（并发上限 {self.chunk_concurrency}）"
+            )
+        else:
+            logger.info(
+                f"音频分为 {len(chunks)} 块，开始顺序转录（已关闭异步并发，逐块执行）"
+            )
 
-        # 3. 并发转录所有块
+        # 3. 按配置并发或顺序转录各块
         chunk_results = self._transcribe_chunks(chunks, callback)
 
         # 4. 合并结果

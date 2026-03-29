@@ -3,8 +3,6 @@ import platform
 import sys
 import traceback
 
-from app.config import TRANSLATIONS_PATH
-
 project_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(project_root)
 
@@ -18,11 +16,13 @@ for file in os.listdir():
     if file.startswith("app") and file.endswith(".pyd"):
         os.remove(file)
 
-from PyQt5.QtCore import Qt, QTranslator  # noqa: E402
+from PyQt5.QtCore import Qt  # noqa: E402
+from PyQt5.QtGui import QIcon  # noqa: E402
 from PyQt5.QtWidgets import QApplication  # noqa: E402
 from qfluentwidgets import FluentTranslator  # noqa: E402
 
 from app.common.config import cfg  # noqa: E402
+from app.config import ASSETS_PATH  # noqa: E402
 from app.core.utils.logger import setup_logger  # noqa: E402
 from app.view.main_window import MainWindow  # noqa: E402
 
@@ -48,6 +48,16 @@ QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)  # type: ignore
 
 app = QApplication(sys.argv)
 app.setAttribute(Qt.AA_DontCreateNativeWidgetSiblings, True)  # type: ignore
+
+_logo = ASSETS_PATH / "logo.png"
+if _logo.exists():
+    app.setWindowIcon(QIcon(str(_logo)))
+
+# 使用 Fusion，避免 macintosh 与自定义深色 QSS 混用导致标签/标题字色异常
+try:
+    app.setStyle("Fusion")
+except Exception:
+    pass
 
 locale = cfg.get(cfg.language).value
 translator = FluentTranslator(locale)

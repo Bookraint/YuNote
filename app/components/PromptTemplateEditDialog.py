@@ -1,5 +1,6 @@
 from typing import Callable
 
+from PyQt5.QtCore import Qt
 from qfluentwidgets import BodyLabel, MessageBoxBase, PlainTextEdit
 
 
@@ -13,6 +14,7 @@ class PromptTemplateEditDialog(MessageBoxBase):
         parent=None,
     ):
         super().__init__(parent)
+        self.setWindowModality(Qt.ApplicationModal)
         self._on_save = on_save
         self.editor = PlainTextEdit()
         self.editor.setTabChangesFocus(True)

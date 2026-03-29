@@ -3,11 +3,13 @@
 每条笔记对应 AppData/notes/{note_id}/ 目录：
 
   meta.json        — 笔记索引（标题、场景、时间、状态、模型等）；列表/打开笔记依赖此文件
-  transcript.txt   — 转录原文
-  summary.md       — AI 总结
+  transcript.txt   — 当前转录原文（主入口）
+  summary.md       — 当前 AI 总结（主入口）
+  versions/        — 可选；在覆盖转录/总结前将旧文件按时间戳归档至此
   audio.wav        — 可选；需格式转换时生成的中间文件，处理完默认删除
 """
 import json
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -82,14 +84,31 @@ class NoteManager:
         self._write_meta(note)
         return note
 
-    def save_transcript(self, note_id: str, text: str) -> Path:
+    def _archive_previous_version(self, file_path: Path, name_prefix: str) -> None:
+        """若文件存在且非空，复制到 versions/{name_prefix}_YYYYMMDD_HHMMSS.ext"""
+        if not file_path.exists():
+            return
+        if not file_path.read_text(encoding="utf-8").strip():
+            return
+        versions = file_path.parent / "versions"
+        versions.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        dest = versions / f"{name_prefix}_{ts}{file_path.suffix}"
+        shutil.copy2(file_path, dest)
+        logger.info("已归档旧版本: %s", dest)
+
+    def save_transcript(self, note_id: str, text: str, *, archive_previous: bool = False) -> Path:
         p = self._note_dir(note_id) / "transcript.txt"
+        if archive_previous:
+            self._archive_previous_version(p, "transcript")
         p.write_text(text, encoding="utf-8")
         logger.info("转录文本已保存: %s", p)
         return p
 
-    def save_summary(self, note_id: str, markdown: str) -> Path:
+    def save_summary(self, note_id: str, markdown: str, *, archive_previous: bool = False) -> Path:
         p = self._note_dir(note_id) / "summary.md"
+        if archive_previous:
+            self._archive_previous_version(p, "summary")
         p.write_text(markdown, encoding="utf-8")
         logger.info("总结已保存: %s", p)
         return p

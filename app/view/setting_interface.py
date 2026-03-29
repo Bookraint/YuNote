@@ -1,34 +1,29 @@
 """
-设置页：LLM / 转录 / 总结 / 笔记 / 界面
+设置页：全局设置（LLM、笔记存储、界面等）。
+转录引擎见转录页；AI 总结参数见笔记详情页。
 """
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import QFileDialog, QWidget
 from qfluentwidgets import (
-    BoolValidator,
     ComboBoxSettingCard,
     ExpandLayout,
     InfoBar,
     InfoBarPosition,
-    OptionsSettingCard,
     PrimaryPushSettingCard,
     PushSettingCard,
-    RangeSettingCard,
     ScrollArea,
     SettingCardGroup,
     SwitchSettingCard,
-    setTheme,
-    setThemeColor,
+)
+from qfluentwidgets import (
     FluentIcon as FIF,
 )
 
 from app.common.config import cfg
 from app.components.EditComboBoxSettingCard import EditComboBoxSettingCard
 from app.components.LineEditSettingCard import LineEditSettingCard
-from app.components.SpinBoxSettingCard import SpinBoxSettingCard
-from app.components.PromptTemplateEditDialog import PromptTemplateEditDialog
-from app.config import APPDATA_PATH, VERSION, PROMPTS_PATH
-from app.core.entities import LLMServiceEnum, NoteSceneEnum, TranscribeModelEnum
-from app.core.llm.check_llm import check_llm_connection, get_available_models
+from app.core.entities import LLMServiceEnum
+from app.core.llm.check_llm import check_llm_connection
 
 
 class LLMCheckThread(QThread):
@@ -56,8 +51,6 @@ class SettingInterface(ScrollArea):
         self._expand_layout.setContentsMargins(36, 10, 36, 0)
 
         self._init_llm_group()
-        self._init_transcribe_group()
-        self._init_summary_group()
         self._init_notes_group()
         self._init_ui_group()
 
@@ -145,259 +138,6 @@ class SettingInterface(ScrollArea):
 
         self._expand_layout.addWidget(group)
 
-    # ── 转录配置 ──────────────────────────────────────────────
-
-    def _init_transcribe_group(self):
-        from app.components.ChunkConcurrencySettingDialog import (
-            ChunkConcurrencySettingDialog,
-        )
-        from app.components.TranscriptionSettingDialog import TranscriptionSettingDialog
-
-        group = SettingCardGroup("转录引擎", self._scroll_widget)
-
-        self._transcribe_model_card = ComboBoxSettingCard(
-            cfg.transcribe_model,
-            FIF.MICROPHONE,
-            "转录引擎",
-            "选择语音转录引擎",
-            texts=[m.value for m in cfg.transcribe_model.options],
-            parent=group,
-        )
-        group.addSettingCard(self._transcribe_model_card)
-
-        self._transcribe_lang_card = ComboBoxSettingCard(
-            cfg.transcribe_language,
-            FIF.LANGUAGE,
-            "转录语言",
-            "音频内容的语言（自动检测可能不准确时手动指定）",
-            texts=[l.value for l in cfg.transcribe_language.options],
-            parent=group,
-        )
-        group.addSettingCard(self._transcribe_lang_card)
-
-        self._chunk_concurrency_card = PushSettingCard(
-            "打开",
-            FIF.SYNC,
-            "并发与分块（长音频）",
-            "并发数、重试、API 限流、整段阈值等，避免请求过多导致失败",
-            group,
-        )
-        group.addSettingCard(self._chunk_concurrency_card)
-        self._chunk_concurrency_card.clicked.connect(
-            lambda: ChunkConcurrencySettingDialog(self.window()).exec_()
-        )
-
-        self._whisper_api_setting_card = PushSettingCard(
-            "打开",
-            FIF.SETTING,
-            "Whisper API 设置",
-            "打开弹窗编辑 Base URL / Key / 模型 / VAD 等参数",
-            group,
-        )
-        group.addSettingCard(self._whisper_api_setting_card)
-        self._whisper_api_setting_card.clicked.connect(
-            lambda: TranscriptionSettingDialog(self.window()).exec_()
-        )
-
-        self._elevenlabs_model_card = LineEditSettingCard(
-            cfg.elevenlabs_model_id,
-            FIF.LABEL,
-            "ElevenLabs 模型 ID",
-            content="一般为 scribe_v1",
-            placeholder="scribe_v1",
-            parent=group,
-        )
-        group.addSettingCard(self._elevenlabs_model_card)
-
-        self._elevenlabs_diarize_card = SwitchSettingCard(
-            FIF.PEOPLE,
-            "ElevenLabs 说话人分离",
-            "开启后对转录文本按说话人标注 [speaker_n]（需账户支持）",
-            cfg.elevenlabs_diarize,
-            group,
-        )
-        group.addSettingCard(self._elevenlabs_diarize_card)
-
-        self._elevenlabs_tag_events_card = SwitchSettingCard(
-            FIF.MUSIC,
-            "标记非语音事件",
-            "在结果中标注笑声、掌声等（英文等语言效果更明显）",
-            cfg.elevenlabs_tag_audio_events,
-            group,
-        )
-        group.addSettingCard(self._elevenlabs_tag_events_card)
-
-        # 仅在 Whisper API / ElevenLabs 模式下显示对应入口，避免 B 接口出现大空隙
-        def _resolve_transcribe_model() -> TranscribeModelEnum | None:
-            raw = cfg.transcribe_model.value
-            if isinstance(raw, TranscribeModelEnum):
-                return raw
-            if isinstance(raw, str):
-                for model in TranscribeModelEnum:
-                    if raw == model.value or raw == model.name:
-                        return model
-            return None
-
-        def _update_transcribe_engine_visibility():
-            model = _resolve_transcribe_model()
-            self._whisper_api_setting_card.setVisible(
-                model == TranscribeModelEnum.WHISPER_API
-            )
-            el = model == TranscribeModelEnum.ELEVENLABS
-            self._elevenlabs_model_card.setVisible(el)
-            self._elevenlabs_diarize_card.setVisible(el)
-            self._elevenlabs_tag_events_card.setVisible(el)
-            group.adjustSize()
-            self._scroll_widget.adjustSize()
-            self.viewport().update()
-
-        _update_transcribe_engine_visibility()
-        cfg.transcribe_model.valueChanged.connect(
-            lambda *_: _update_transcribe_engine_visibility()
-        )
-        # 某些情况下 ComboBox 改变先于 ConfigItem 更新，额外监听 UI 事件确保即时刷新
-        self._transcribe_model_card.comboBox.currentTextChanged.connect(  # type: ignore[attr-defined]
-            lambda *_: _update_transcribe_engine_visibility()
-        )
-
-        self._expand_layout.addWidget(group)
-
-    # ── 总结配置 ──────────────────────────────────────────────
-
-    def _init_summary_group(self):
-        group = SettingCardGroup("AI 总结", self._scroll_widget)
-
-        self._default_scene_card = ComboBoxSettingCard(
-            cfg.default_scene,
-            FIF.DOCUMENT,
-            "默认场景",
-            "新建笔记时预选的总结场景",
-            texts=[s.value for s in cfg.default_scene.options],
-            parent=group,
-        )
-        group.addSettingCard(self._default_scene_card)
-
-        self._auto_summary_card = SwitchSettingCard(
-            FIF.ROBOT,
-            "自动总结",
-            "转录完成后自动调用 LLM 生成总结",
-            cfg.auto_summary,
-            group,
-        )
-        group.addSettingCard(self._auto_summary_card)
-
-        self._chunk_size_card = RangeSettingCard(
-            cfg.summary_chunk_size,
-            FIF.LAYOUT,
-            "分块大小",
-            "长文本分块处理时每块的最大字符数",
-            group,
-        )
-        group.addSettingCard(self._chunk_size_card)
-
-        self._summary_map_concurrency_card = SpinBoxSettingCard(
-            cfg.summary_map_concurrency,
-            FIF.SYNC,
-            "总结 Map 并发数",
-            "长文分多块并行提取要点时，同时发起的 LLM 请求数（1=顺序）",
-            minimum=1,
-            maximum=16,
-            parent=group,
-        )
-        group.addSettingCard(self._summary_map_concurrency_card)
-
-        self._summary_map_rpm_card = SpinBoxSettingCard(
-            cfg.summary_map_rpm,
-            FIF.WIFI,
-            "总结 Map API 限速 (RPM)",
-            "每分钟最多请求次数，避免触发服务商限流；0 表示不限制",
-            minimum=0,
-            maximum=500,
-            parent=group,
-        )
-        group.addSettingCard(self._summary_map_rpm_card)
-
-        # 场景模板：点击编辑（避免主页面滚动卡住）
-        scene_to_filename = {
-            NoteSceneEnum.MEETING: "summary_meeting.md",
-            NoteSceneEnum.LECTURE: "summary_lecture.md",
-            NoteSceneEnum.INTERVIEW: "summary_interview.md",
-            NoteSceneEnum.GENERAL: "summary_general.md",
-        }
-        scene_to_override_item = {
-            NoteSceneEnum.MEETING: cfg.summary_prompt_template_meeting,
-            NoteSceneEnum.LECTURE: cfg.summary_prompt_template_lecture,
-            NoteSceneEnum.INTERVIEW: cfg.summary_prompt_template_interview,
-            NoteSceneEnum.GENERAL: cfg.summary_prompt_template_general,
-        }
-
-        def _load_template_text(scene: NoteSceneEnum) -> str:
-            # 优先使用用户覆盖内容（为空则回退到内置模板）
-            override_item = scene_to_override_item.get(scene)
-            if override_item is not None and override_item.value:
-                return override_item.value
-
-            filename = scene_to_filename.get(scene, "summary_general.md")
-            template_path = PROMPTS_PATH / filename
-            if template_path.exists():
-                return template_path.read_text(encoding="utf-8")
-            return ""
-
-        def _preview(text: str) -> str:
-            lines = text.strip().splitlines()
-            first = lines[0] if lines else ""
-            first = first.strip()
-            if not first:
-                return self.tr("（内置模板）")
-            return first[:60] + ("…" if len(first) > 60 else "")
-
-        self._scene_template_edit_card = PushSettingCard(
-            self.tr("编辑"),
-            FIF.EDIT,
-            self.tr("场景模板"),
-            _preview(_load_template_text(cfg.default_scene.value)),
-            parent=group,
-        )
-        group.addSettingCard(self._scene_template_edit_card)
-
-        def _on_scene_template_edit():
-            scene = cfg.default_scene.value
-            override_item = scene_to_override_item.get(scene)
-            initial_text = _load_template_text(scene)
-
-            def _save(text: str):
-                if override_item is not None:
-                    cfg.set(override_item, text)
-                self._scene_template_edit_card.setContent(_preview(text))
-
-            dialog = PromptTemplateEditDialog(
-                initial_text=initial_text,
-                on_save=_save,
-                parent=self.window(),
-            )
-            dialog.exec_()
-
-        self._scene_template_edit_card.clicked.connect(_on_scene_template_edit)
-
-        def _on_summary_scene_changed(*_):
-            self._scene_template_edit_card.setContent(
-                _preview(_load_template_text(cfg.default_scene.value))
-            )
-
-        cfg.default_scene.valueChanged.connect(_on_summary_scene_changed)
-
-        self._custom_prompt_card = LineEditSettingCard(
-            cfg.summary_custom_prompt,
-            FIF.EDIT,
-            "追加指令",
-            content="",
-            placeholder="附加在 Prompt 末尾的自定义要求（留空则不追加）",
-            parent=group,
-        )
-        group.addSettingCard(self._custom_prompt_card)
-
-        self._expand_layout.addWidget(group)
-
     # ── 笔记配置 ──────────────────────────────────────────────
 
     def _init_notes_group(self):
@@ -412,26 +152,6 @@ class SettingInterface(ScrollArea):
         )
         self._notes_dir_card.clicked.connect(self._choose_notes_dir)
         group.addSettingCard(self._notes_dir_card)
-
-        self._export_dir_card = PushSettingCard(
-            "选择目录",
-            FIF.FOLDER,
-            "导出目录",
-            str(cfg.export_dir.value),
-            group,
-        )
-        self._export_dir_card.clicked.connect(self._choose_export_dir)
-        group.addSettingCard(self._export_dir_card)
-
-        self._export_fmt_card = ComboBoxSettingCard(
-            cfg.default_export_format,
-            FIF.DOCUMENT,
-            "默认导出格式",
-            "",
-            texts=["markdown", "txt", "docx"],
-            parent=group,
-        )
-        group.addSettingCard(self._export_fmt_card)
 
         self._keep_work_card = SwitchSettingCard(
             FIF.SAVE,
@@ -494,9 +214,3 @@ class SettingInterface(ScrollArea):
         if path:
             cfg.set(cfg.notes_dir, path)
             self._notes_dir_card.setContent(path)
-
-    def _choose_export_dir(self):
-        path = QFileDialog.getExistingDirectory(self, "选择导出目录", str(cfg.export_dir.value))
-        if path:
-            cfg.set(cfg.export_dir, path)
-            self._export_dir_card.setContent(path)
