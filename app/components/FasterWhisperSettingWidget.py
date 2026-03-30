@@ -40,7 +40,7 @@ from app.core.entities import (
     TranscribeLanguageEnum,
     VadMethodEnum,
 )
-from app.core.utils.platform_utils import open_folder
+from app.core.utils.platform_utils import get_subprocess_kwargs, open_folder
 from app.thread.file_download_thread import FileDownloadThread
 from app.thread.modelscope_download_thread import ModelscopeDownloadThread
 
@@ -166,7 +166,7 @@ class UnzipThread(QThread):
             subprocess.run(
                 ["7z", "x", self.zip_file, f"-o{self.extract_path}", "-y"],
                 check=True,
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                **get_subprocess_kwargs(),
             )
             # 删除压缩包
             os.remove(self.zip_file)

@@ -1,5 +1,4 @@
 import hashlib
-import os
 import re
 import shutil
 import subprocess
@@ -10,6 +9,7 @@ from typing import Any, Callable, List, Optional, Union
 import GPUtil
 
 from ..utils.logger import setup_logger
+from ..utils.platform_utils import get_subprocess_kwargs
 from ..utils.subprocess_helper import StreamReader
 from .asr_data import ASRData, ASRDataSeg
 from .base import BaseASR
@@ -255,7 +255,7 @@ class FasterWhisperASR(BaseASR):
                 text=True,
                 encoding="utf-8",
                 errors="ignore",
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                **get_subprocess_kwargs(),
             )
 
             # 使用 StreamReader 处理输出

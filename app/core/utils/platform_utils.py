@@ -66,17 +66,16 @@ def open_file(path):
 
 def get_subprocess_kwargs():
     """
-    获取跨平台的subprocess参数
+    供 subprocess.run / Popen 使用的额外关键字参数。
 
-    Returns:
-        dict: subprocess参数字典
+    Windows 下 GUI 进程（如无控制台窗口的 PyInstaller --windowed）拉起 ffmpeg、
+    whisper-cli 等控制台子进程时，若不加 CREATE_NO_WINDOW，会反复闪现黑色 cmd 窗口。
+    非 Windows 返回空 dict。
     """
     kwargs = {}
 
-    # 仅在Windows上添加CREATE_NO_WINDOW标志
-    if platform.system() == "Windows":
-        if hasattr(subprocess, "CREATE_NO_WINDOW"):
-            kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    if platform.system() == "Windows" and hasattr(subprocess, "CREATE_NO_WINDOW"):
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
     return kwargs
 

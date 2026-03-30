@@ -6,6 +6,14 @@ import traceback
 project_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(project_root)
 
+# PyInstaller：随包自带的 ffmpeg/ffprobe（见 YuNote.spec 中 resource/bin/ffmpeg）
+if getattr(sys, "frozen", False):
+    _meipass = getattr(sys, "_MEIPASS", None)
+    if _meipass:
+        _ffmpeg_bin = os.path.join(_meipass, "resource", "bin", "ffmpeg")
+        if os.path.isdir(_ffmpeg_bin):
+            os.environ["PATH"] = _ffmpeg_bin + os.pathsep + os.environ.get("PATH", "")
+
 lib_folder = "Lib" if platform.system() == "Windows" else "lib"
 plugin_path = os.path.join(
     sys.prefix, lib_folder, "site-packages", "PyQt5", "Qt5", "plugins"

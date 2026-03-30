@@ -2,6 +2,11 @@
 /resource/bin/
 !/resource/bin/bin_environment.txt
 
+# 打包
+/build/
+/dist/  
+*.spec
+
 # 开发环境
 .idea/
 *.pyc

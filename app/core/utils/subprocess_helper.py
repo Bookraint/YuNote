@@ -6,6 +6,7 @@ import threading
 from typing import Callable, Optional, Tuple
 
 from ..utils.logger import setup_logger
+from .platform_utils import get_subprocess_kwargs
 
 logger = setup_logger("subprocess_helper")
 
@@ -102,13 +103,14 @@ def run_process_with_stream_reader(
     运行子进程并使用StreamReader处理输出
     """
 
-    # 设置默认参数
+    # 设置默认参数（Windows 下避免子进程弹出控制台窗口）
     default_kwargs = {
         "stdout": subprocess.PIPE,
         "stderr": subprocess.PIPE,
         "text": True,
         "encoding": "utf-8",
         "bufsize": 1,  # 行缓冲
+        **get_subprocess_kwargs(),
     }
     default_kwargs.update(popen_kwargs)
 

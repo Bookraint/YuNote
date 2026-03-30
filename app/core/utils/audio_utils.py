@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 from app.core.utils.logger import setup_logger
+from app.core.utils.platform_utils import get_subprocess_kwargs
 
 logger = setup_logger("audio_utils")
 
@@ -43,6 +44,7 @@ def get_duration(file_path: str) -> float:
             capture_output=True,
             text=True,
             timeout=30,
+            **get_subprocess_kwargs(),
         )
         info = json.loads(result.stdout)
         return float(info.get("format", {}).get("duration", 0))
@@ -95,6 +97,7 @@ def convert_to_wav(
             capture_output=True,
             text=True,
             timeout=300,
+            **get_subprocess_kwargs(),
         )
         if result.returncode != 0:
             logger.error("ffmpeg 转换失败:\n%s", result.stderr)
