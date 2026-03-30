@@ -4,7 +4,7 @@ from typing import Optional
 
 from app.common.config import cfg
 from app.core.utils.note_id import allocate_note_folder_id
-from app.config import MODEL_PATH, NOTES_PATH, PROMPTS_PATH
+from app.config import MODEL_PATH, PROMPTS_PATH
 from app.core.entities import (
     LANGUAGES,
     FasterWhisperModelEnum,

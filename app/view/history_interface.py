@@ -16,7 +16,6 @@ from PyQt5.QtWidgets import (
 )
 
 from app.common.signal_bus import signalBus
-from app.config import NOTES_PATH
 from app.core.entities import Note, NoteSceneEnum, TaskStatusEnum
 from app.core.notes import NoteManager
 from app.core.utils.audio_utils import format_duration
@@ -94,7 +93,7 @@ class HistoryInterface(QWidget):
         self.setObjectName("historyInterface")
         self.setWindowTitle("历史")
 
-        self._note_manager = NoteManager(NOTES_PATH)
+        self._note_manager = NoteManager()
         self._all_notes: list[Note] = []
 
         self._init_ui()

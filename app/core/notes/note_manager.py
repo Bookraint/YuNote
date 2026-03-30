@@ -1,6 +1,6 @@
 """
 笔记的 CRUD 操作。
-每条笔记对应 AppData/notes/{note_id}/ 目录：
+每条笔记对应「设置 → 笔记存储目录」下的 {note_id}/ 目录：
 
   meta.json        — 笔记索引（标题、场景、时间、状态、模型等）；列表/打开笔记依赖此文件
   transcript.txt   — 当前转录原文（主入口）
@@ -14,6 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from app.common.config import cfg
 from app.core.entities import Note, NoteSceneEnum, TaskStatusEnum
 from app.core.utils.logger import setup_logger
 
@@ -59,10 +60,16 @@ def _deserialize_note(data: dict) -> Note:
 
 
 class NoteManager:
+    """笔记根目录始终与设置项 cfg.notes_dir 一致（与转录/总结任务输出路径对齐）。"""
 
-    def __init__(self, notes_root: Path):
-        self.notes_root = notes_root
-        self.notes_root.mkdir(parents=True, exist_ok=True)
+    def __init__(self):
+        pass
+
+    @property
+    def notes_root(self) -> Path:
+        p = Path(cfg.notes_dir.value)
+        p.mkdir(parents=True, exist_ok=True)
+        return p
 
     def _note_dir(self, note_id: str) -> Path:
         return self.notes_root / note_id

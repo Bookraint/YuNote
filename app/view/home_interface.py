@@ -21,7 +21,6 @@ from PyQt5.QtWidgets import (
 
 from app.common.config import cfg
 from app.common.signal_bus import signalBus
-from app.config import NOTES_PATH
 from app.core.entities import TaskStatusEnum
 from app.core.notes import NoteManager
 from app.core.task_factory import TaskFactory
@@ -132,7 +131,7 @@ class HomeInterface(QWidget):
         self._note_id: str = ""
         self._transcribe_thread: QThread | None = None
         self._summary_thread: QThread | None = None
-        self._note_manager = NoteManager(NOTES_PATH)
+        self._note_manager = NoteManager()
 
         self._init_ui()
 

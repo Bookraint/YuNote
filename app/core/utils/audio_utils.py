@@ -133,7 +133,7 @@ def prepare_audio(
 
     Args:
         input_path: 用户导入的原始文件
-        note_dir: 笔记目录路径（AppData/notes/{note_id}/）
+        note_dir: 笔记目录路径（设置中的笔记存储目录/{note_id}/）
 
     Returns:
         可直接送入 ASR 的 WAV 文件路径，失败返回 None。

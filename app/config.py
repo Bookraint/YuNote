@@ -39,6 +39,6 @@ LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 os.environ["PATH"] = str(FASTER_WHISPER_PATH) + os.pathsep + os.environ["PATH"]
 os.environ["PATH"] = str(BIN_PATH) + os.pathsep + os.environ["PATH"]
 
-# 创建必要目录
-for p in [LOG_PATH, MODEL_PATH, NOTES_PATH, CACHE_PATH]:
+# 创建必要目录（笔记目录由设置 NotesDir 决定，在 NoteManager / 任务中按需创建，避免与自定义路径不一致时仍建 AppData/notes）
+for p in [LOG_PATH, MODEL_PATH, CACHE_PATH]:
     p.mkdir(parents=True, exist_ok=True)

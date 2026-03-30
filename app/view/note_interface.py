@@ -24,7 +24,6 @@ from PyQt5.QtWidgets import (
 
 from app.common.config import cfg
 from app.components.SummarySettingsDialog import SummarySettingsDialog
-from app.config import NOTES_PATH
 from app.core.entities import Note
 from app.core.notes import NoteManager
 from app.core.task_factory import TaskFactory
@@ -53,7 +52,7 @@ class NoteInterface(QWidget):
         self.setObjectName("noteInterface")
         self.setWindowTitle("笔记")
 
-        self._note_manager = NoteManager(NOTES_PATH)
+        self._note_manager = NoteManager()
         self._current_note: Note | None = None
         self._transcript_plain: str = ""
         self._summary_raw_md: str = ""
