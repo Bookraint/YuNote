@@ -27,6 +27,7 @@ from app.view.home_interface import HomeInterface
 from app.view.mac_styles import application_stylesheet
 from app.view.note_interface import NoteInterface
 from app.view.setting_interface import SettingInterface
+from app.view.ui_helpers import apply_message_box_style
 
 LOGO_PATH = ASSETS_PATH / "logo.png"
 
@@ -187,13 +188,14 @@ class MainWindow(QMainWindow):
 
     def _on_new_version(self, version, update_required, update_info, download_url):
         content = f"发现新版本 {version}\n\n{update_info}"
-        reply = QMessageBox.question(
-            self,
-            "发现新版本",
-            content,
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.Yes,
-        )
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Question)
+        box.setWindowTitle("发现新版本")
+        box.setText(content)
+        box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        box.setDefaultButton(QMessageBox.Yes)
+        apply_message_box_style(box)
+        reply = box.exec_()
         if reply == QMessageBox.Yes:
             QDesktopServices.openUrl(QUrl(download_url))
 
@@ -208,8 +210,10 @@ class MainWindow(QMainWindow):
 
     def _check_ffmpeg(self):
         if shutil.which("ffmpeg") is None:
-            QMessageBox.warning(
-                self,
-                "FFmpeg 未安装",
-                "处理音频文件需要 FFmpeg，请先安装并加入 PATH。",
-            )
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Warning)
+            box.setWindowTitle("FFmpeg 未安装")
+            box.setText("处理音频文件需要 FFmpeg，请先安装并加入 PATH。")
+            box.setStandardButtons(QMessageBox.Ok)
+            apply_message_box_style(box)
+            box.exec_()

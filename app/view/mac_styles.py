@@ -203,6 +203,39 @@ def application_stylesheet() -> str:
     """
 
 
+def message_box_stylesheet() -> str:
+    """
+    系统 QMessageBox 常为浅灰/白底；若继承全局 QLabel 浅色字会不可读。
+    统一为深色底 + 浅色文字，与主界面一致。
+    """
+    return """
+    QMessageBox {
+        background-color: #2c2c2e;
+    }
+    QMessageBox QLabel {
+        color: #f2f2f7;
+        font-size: 13px;
+    }
+    QMessageBox QPushButton {
+        background-color: #3a3a3c;
+        color: #f2f2f7;
+        border: 1px solid #48484a;
+        border-radius: 6px;
+        padding: 6px 18px;
+        min-width: 72px;
+        min-height: 26px;
+    }
+    QMessageBox QPushButton:hover {
+        background-color: #48484a;
+    }
+    QMessageBox QPushButton:default {
+        background-color: #0a84ff;
+        color: #ffffff;
+        border-color: #0a84ff;
+    }
+    """
+
+
 def summary_settings_dialog_stylesheet() -> str:
     """
     「AI 总结参数」独立 QDialog：未套用主窗口 centralWidget 的 stylesheet，
