@@ -1,7 +1,32 @@
 import os
 import platform
+import subprocess
 import sys
 import traceback
+
+
+def _patch_subprocess_popen_for_frozen_windows() -> None:
+    """
+    PyInstaller --windowed 下主进程无控制台；pydub 等库会 ``from subprocess import Popen``。
+    必须用 **Popen 的子类** 替换（不能换成普通函数），否则 importlib/部分依赖会把 Popen
+    当类型用，触发 ``function() argument 'code' must be code, not str`` 等异常。
+    """
+    if os.name != "nt" or not getattr(sys, "frozen", False):
+        return
+    if not hasattr(subprocess, "CREATE_NO_WINDOW"):
+        return
+    _Base = subprocess.Popen
+
+    class _PopenNoConsole(_Base):
+        def __init__(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            if "creationflags" not in kwargs:
+                kwargs = {**kwargs, "creationflags": subprocess.CREATE_NO_WINDOW}
+            super().__init__(*args, **kwargs)
+
+    subprocess.Popen = _PopenNoConsole  # type: ignore[method-assign]
+
+
+_patch_subprocess_popen_for_frozen_windows()
 
 project_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(project_root)

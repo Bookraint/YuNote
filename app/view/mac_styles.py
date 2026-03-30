@@ -201,3 +201,88 @@ def application_stylesheet() -> str:
         width: 1px;
     }
     """
+
+
+def summary_settings_dialog_stylesheet() -> str:
+    """
+    「AI 总结参数」独立 QDialog：未套用主窗口 centralWidget 的 stylesheet，
+    默认系统白底 + Fluent 暗色主题字色会导致浅灰字几乎不可见。
+    与主界面同为深色底、高对比文字与控件。
+    """
+    return """
+    QDialog#summarySettingsDialog {
+        background-color: #1c1c1e;
+    }
+    QScrollArea#summarySettingsScroll {
+        background-color: #1c1c1e;
+        border: none;
+    }
+    QWidget#summarySettingsInner {
+        background-color: #1c1c1e;
+    }
+    QDialog#summarySettingsDialog QLabel {
+        color: #f2f2f7;
+    }
+    QDialog#summarySettingsDialog QLabel#contentLabel {
+        color: #aeaeb2;
+        font-size: 12px;
+    }
+    QDialog#summarySettingsDialog QPushButton {
+        background-color: #3a3a3c;
+        color: #f2f2f7;
+        border: 1px solid #48484a;
+        border-radius: 6px;
+        padding: 6px 14px;
+        min-height: 22px;
+    }
+    QDialog#summarySettingsDialog QPushButton:hover {
+        background-color: #48484a;
+    }
+    QDialog#summarySettingsDialog QPushButton:default {
+        background-color: #0a84ff;
+        color: #ffffff;
+        border-color: #0a84ff;
+    }
+    QDialog#summarySettingsDialog QComboBox {
+        background-color: #2c2c2e;
+        border: 1px solid #48484a;
+        border-radius: 6px;
+        padding: 5px 10px;
+        min-height: 22px;
+        color: #f2f2f7;
+    }
+    QDialog#summarySettingsDialog QComboBox QAbstractItemView {
+        background-color: #2c2c2e;
+        color: #f2f2f7;
+        selection-background-color: #0a84ff;
+        border: 1px solid #48484a;
+    }
+    QDialog#summarySettingsDialog QLineEdit {
+        background-color: #2c2c2e;
+        border: 1px solid #48484a;
+        border-radius: 6px;
+        padding: 6px 10px;
+        color: #f2f2f7;
+        selection-background-color: #0a84ff;
+    }
+    QDialog#summarySettingsDialog QSpinBox {
+        background-color: #2c2c2e;
+        border: 1px solid #48484a;
+        border-radius: 6px;
+        padding: 4px 8px;
+        color: #f2f2f7;
+        min-height: 22px;
+    }
+    QDialog#summarySettingsDialog QSlider::groove:horizontal {
+        background: #3a3a3c;
+        height: 4px;
+        border-radius: 2px;
+    }
+    QDialog#summarySettingsDialog QSlider::handle:horizontal {
+        background: #0a84ff;
+        width: 16px;
+        height: 16px;
+        margin: -6px 0;
+        border-radius: 8px;
+    }
+    """

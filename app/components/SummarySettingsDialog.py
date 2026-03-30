@@ -12,25 +12,31 @@ from PyQt5.QtWidgets import (
 )
 
 from app.view.fluent_setting_blocks import SummarySettingsBlock
+from app.view.mac_styles import summary_settings_dialog_stylesheet
 
 
 class SummarySettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setObjectName("summarySettingsDialog")
+        self.setAttribute(Qt.WA_StyledBackground, True)
         self.setWindowTitle("AI 总结参数")
         self.setModal(True)
         self.resize(540, 620)
         self.setMinimumWidth(480)
+        self.setStyleSheet(summary_settings_dialog_stylesheet())
 
         root = QVBoxLayout(self)
         root.setSpacing(12)
 
         scroll = QScrollArea()
+        scroll.setObjectName("summarySettingsScroll")
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
         inner = QWidget()
+        inner.setObjectName("summarySettingsInner")
         inner_layout = QVBoxLayout(inner)
         inner_layout.setContentsMargins(0, 0, 8, 0)
 
