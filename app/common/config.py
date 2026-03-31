@@ -234,8 +234,8 @@ class Config(QConfig):
     # ── 界面配置 ───────────────────────────────────────────────
     micaEnabled = ConfigItem("MainWindow", "MicaEnabled", False, BoolValidator())
     dpiScale = OptionsConfigItem(
-        "MainWindow", "DpiScale", "Auto",
-        OptionsValidator([1, 1.25, 1.5, 1.75, 2, "Auto"]),
+        "MainWindow", "DpiScale", 1,
+        OptionsValidator([1, 1.25, 1.5, 1.75, 2]),
         restart=True,
     )
     language = OptionsConfigItem(

@@ -69,14 +69,8 @@ def exception_hook(exctype, value, tb):
 
 sys.excepthook = exception_hook
 
-if cfg.get(cfg.dpiScale) == "Auto":
-    QApplication.setHighDpiScaleFactorRoundingPolicy(
-        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough  # type: ignore
-    )
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)  # type: ignore
-else:
-    os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "0"
-    os.environ["QT_SCALE_FACTOR"] = str(cfg.get(cfg.dpiScale))
+os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "0"
+os.environ["QT_SCALE_FACTOR"] = str(cfg.get(cfg.dpiScale))
 QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)  # type: ignore
 
 app = QApplication(sys.argv)

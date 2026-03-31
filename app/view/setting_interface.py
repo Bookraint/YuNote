@@ -174,7 +174,7 @@ class SettingInterface(ScrollArea):
             FIF.ZOOM,
             "缩放比例",
             "修改后重启生效",
-            texts=["1x", "1.25x", "1.5x", "1.75x", "2x", "Auto"],
+            texts=["1x", "1.25x", "1.5x", "1.75x", "2x"],
             parent=group,
         )
         group.addSettingCard(self._dpi_card)
